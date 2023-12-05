@@ -1,0 +1,20 @@
+name = "LegendEventAnalysis"
+uuid = "ca666546-4c2a-41e4-9648-72713d810efe"
+version = "0.1.0"
+
+[deps]
+ArraysOfArrays = "65a8f2f4-9b39-5baf-92e2-a9cc46fdf018"
+LegendDataTypes = "99e09c13-5545-5ee2-bfa2-77f358fb75d8"
+ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
+PropertyFunctions = "09e99361-2bb8-48a2-a80f-de58f0739eb4"
+StructArrays = "09ab397b-f2b6-538f-b94a-2f83cf4a842a"
+Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
+
+[compat]
+ArraysOfArrays = "0.6"
+LegendDataTypes = "0.1.4"
+ProgressMeter = "1"
+PropertyFunctions = "0.2"
+StructArrays = "0.4, 0.5, 0.6"
+Unitful = "1"
+julia = "1.9"
