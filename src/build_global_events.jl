@@ -125,7 +125,7 @@ function build_global_events(
     channels::AbstractVector{<:ChannelIdLike} = collect(keys(data));
     ts_window::Number = 25u"μs"
 )
-    flat_data = flatten_over_channels(data).result
+    flat_data = flatten_over_channels(data, channels).result
     evtmap = build_global_event_map(flat_data; ts_window = ts_window)
     return apply_event_map(flat_data, evtmap)
 end
