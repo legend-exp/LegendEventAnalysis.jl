@@ -130,3 +130,33 @@ function build_global_events(
     return apply_event_map(flat_data, evtmap)
 end
 export build_global_events
+
+
+"""
+    function build_cross_system_events(
+        data::NamedTuple,
+        ts_window::Number = 25u"μs"
+    )
+
+Build cross-system events.
+
+`data` must be a NamedTuple with properties that represent the names of
+experiment (sub)-systems and values that are the result of
+[`build_global_events`](@ref) for each system.
+
+Note: Currently requires the `tstart` columns of all systems to be identical.
+"""
+function build_cross_system_events(data::NamedTuple)
+    tstarts = map(x -> x.tstart, data)
+    tstart_ref = first(tstarts)
+    for i in eachindex(tstarts)[2:end]
+        if (tstarts[i] != tstart_ref) throw(ArgumentError("tstart doesn't match across subsystems")) end
+    end
+    new_cols = merge((tstart = tstart_ref,), data)
+    StructVector(new_cols)
+end
+export build_cross_system_events
+
+#_similar_empty(x::Number) = typeof(x)(NaN)
+#_similar_empty(x::Integer) = typeof(x)(0)
+#_similar_empty(V::AbstractVector) = similar(V, 0)
