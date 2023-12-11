@@ -10,6 +10,7 @@ using Unitful
 
 using LegendDataManagement
 
+using IntervalSets: leftendpoint, rightendpoint
 using ProgressMeter: @showprogress
 using PropertyFunctions: PropertyFunction, @pf
 

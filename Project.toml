@@ -4,6 +4,7 @@ version = "0.1.0"
 
 [deps]
 ArraysOfArrays = "65a8f2f4-9b39-5baf-92e2-a9cc46fdf018"
+IntervalSets = "8197267c-284f-5f27-9208-e0e47529a953"
 LegendDataManagement = "9feedd95-f0e0-423f-a8dc-de0970eae6b3"
 LegendDataTypes = "99e09c13-5545-5ee2-bfa2-77f358fb75d8"
 ProgressMeter = "92933f4c-e287-5a05-a399-4b506db050ca"
@@ -14,6 +15,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 
 [compat]
 ArraysOfArrays = "0.6"
+IntervalSets = "0.6, 0.7"
 LegendDataManagement = "0.2.5"
 LegendDataTypes = "0.1.4"
 ProgressMeter = "1"
