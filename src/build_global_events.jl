@@ -34,7 +34,6 @@ function build_global_event_map(data::StructVector; ts_window::Number = 25u"μs"
     this_evt_timestamps = Vector{eltype(data.timestamp)}()
 
     all_start = Vector{eltype(data.timestamp)}()
-    all_multiplicity = Vector{Int}()
     all_dataidxs = VectorOfVectors{Int}()
     all_channels = VectorOfVectors{eltype(data.channel)}()
     all_chevtnos = VectorOfVectors{Int}()
@@ -44,7 +43,6 @@ function build_global_event_map(data::StructVector; ts_window::Number = 25u"μs"
         if !isempty(this_evt_channels)
             push!(all_start, this_evt_start)
             push!(all_dataidxs, this_evt_dataidxs); empty!(this_evt_dataidxs)
-            push!(all_multiplicity, length(this_evt_chevtnos))
             push!(all_chevtnos, this_evt_chevtnos); empty!(this_evt_chevtnos)
             push!(all_channels, this_evt_channels); empty!(this_evt_channels)
             push!(all_timestamps, this_evt_timestamps); empty!(this_evt_timestamps)
@@ -69,7 +67,7 @@ function build_global_event_map(data::StructVector; ts_window::Number = 25u"μs"
     _flush_evt(-1)
 
     return StructVector(
-        tstart = all_start, multiplicity = all_multiplicity, dataidx = all_dataidxs,
+        tstart = all_start, dataidx = all_dataidxs,
         chevtno = all_chevtnos, channel = all_channels, timestamp = all_timestamps
     )
 end
@@ -90,7 +88,7 @@ function apply_event_map(data::StructVector, evtmap::StructVector)
 
     map(data_cols, evt_cols) do c, ac
         for idx in evtmap.dataidx
-            push!(ac, c[idx])
+            push!(ac, view(c, idx))
         end
         nothing
     end
@@ -153,7 +151,7 @@ function build_cross_system_events(data::NamedTuple)
         if (tstarts[i] != tstart_ref) throw(ArgumentError("tstart doesn't match across subsystems")) end
     end
     new_cols = merge((tstart = tstart_ref,), data)
-    StructVector(new_cols)
+    return StructVector(new_cols)
 end
 export build_cross_system_events
 

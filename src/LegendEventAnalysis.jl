@@ -10,9 +10,9 @@ using Unitful
 
 using LegendDataManagement
 
-using IntervalSets: leftendpoint, rightendpoint
+using IntervalSets: AbstractInterval, ClosedInterval, leftendpoint, rightendpoint
 using ProgressMeter: @showprogress
-using PropertyFunctions: PropertyFunction, @pf
+using PropertyFunctions: PropertyFunction, @pf, filterby
 
 using Tables: columns
 
@@ -20,5 +20,8 @@ using LegendDataTypes: fast_flatten
 
 include("flatten_over_channels.jl")
 include("build_global_events.jl")
+include("calibrate_geds.jl")
+include("calibrate_smps.jl")
+include("calibrate_all.jl")
 
 end # module
