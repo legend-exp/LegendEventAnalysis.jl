@@ -1,6 +1,14 @@
 # This file is a part of LegendEventAnalysis.jl, licensed under the MIT License (MIT).
 
-function _calibrate_ged_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+"""
+    calibrate_ged_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+
+Apply the calibration specified by `data` and `sel` for the given HPGe
+`detector` to the single-channel `channel_data` for that detector.
+
+Also calculates the configured cut/flag values.
+"""
+function calibrate_ged_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
     chdata = channel_data[:]
 
     cal_pf = get_ged_cal_propfunc(data, sel, detector)
@@ -9,6 +17,7 @@ function _calibrate_ged_data(data::LegendData, sel::ValiditySelection, detector:
     cut_pf = LegendDataManagement.get_ged_qc_cuts_propfunc(data, sel)
     cut_isgood_pf = LegendDataManagement.get_ged_qc_isgood_propfunc(data, sel)
     
+    # ToDo: Make channel output configurable:
     chdata_output_pf = @pf (
         timestamp = $timestamp,
         t0 = $t0,
@@ -34,3 +43,4 @@ function _calibrate_ged_data(data::LegendData, sel::ValiditySelection, detector:
 
     return StructVector(merge(columns(chdata_output), columns(cal_output), columns(postcal_data), columns(cut_output), additional_cols))
 end
+export calibrate_ged_channel_data

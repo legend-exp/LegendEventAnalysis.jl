@@ -1,20 +1,30 @@
 # This file is a part of LegendEventAnalysis.jl, licensed under the MIT License (MIT).
 
-function _calibrate_spm_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+"""
+    calibrate_spm_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+
+Apply the calibration specified by `data` and `sel` for the given SiPM
+`detector` to the single-channel `channel_data` for that detector.
+
+Also calculates the configured cut/flag values.
+"""
+function calibrate_spm_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
     chdata = channel_data[:]
 
-    larcal_pf = get_lar_cal_propfunc(data, sel, detector)
+    spmcal_pf = get_spm_cal_propfunc(data, sel, detector)
 
+    # ToDo: Make channel output configurable:
     chdata_output = (
         timestamp = chdata.timestamp,
         trig_pos = VectorOfArrays(chdata.trig_pos),
     )
 
-    cal_output_novv = larcal_pf.(chdata)
+    cal_output_novv = spmcal_pf.(chdata)
     cal_output = StructArray(map(VectorOfArrays, columns(cal_output_novv)))
 
     return StructVector(merge(chdata_output, columns(cal_output)))
 end
+export calibrate_spm_channel_data
 
 
 function _single_fiber_esum(

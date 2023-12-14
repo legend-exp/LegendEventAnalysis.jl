@@ -15,10 +15,13 @@ function calibrate_all(data::LegendData, sel::ValiditySelection, datastore::Abst
     spms_channels = ChannelId.(filterby(@pf $system == :spms && $processable)(chinfo).channel)
     puls_channels = ChannelId.(filterby(@pf $detector == DetectorId(:PULS01ANA))(chinfo).channel)
 
+
+    # HPGe:
+
     ged_caldata = Dict([
         let detector = channelinfo(data, sel, channel).detector,
             chdata = ds[channel][:]
-            channel => _calibrate_ged_data(data, sel, detector, chdata)
+            channel => calibrate_ged_channel_data(data, sel, detector, chdata)
         end
         for channel in geds_channels
     ])
@@ -50,24 +53,45 @@ function calibrate_all(data::LegendData, sel::ValiditySelection, datastore::Abst
         emax_zac_ctc_cal = getindex.(ged_events_pre.e_zac_ctc_cal, emax_ch),
     )
     ged_events = StructVector(merge(columns(ged_events_pre), ged_additional_cols))
-    
-    lar_caldata = Dict([
+
+
+    # SiPM:
+
+    spm_caldata = Dict([
         let detector = channelinfo(data, sel, channel).detector,
             chdata = ds[channel][:]
-            channel => _calibrate_spm_data(data, sel, detector, chdata)
+            channel => calibrate_spm_channel_data(data, sel, detector, chdata)
         end
         for channel in spms_channels
     ])
-    lar_events_novov = build_global_events(lar_caldata, spms_channels)
-    lar_events = StructArray(map(_fix_vov, columns(lar_events_novov)))
+    spm_events_novov = build_global_events(spm_caldata, spms_channels)
+    spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
+
+
+    # Pulser:
+
+    pls_caldata = Dict([
+        let detector = channelinfo(data, sel, channel).detector,
+            chdata = ds[channel][:]
+            channel => calibrate_pls_channel_data(data, sel, detector, chdata)
+        end
+        for channel in puls_channels
+    ])
+    pls_events = build_global_events(pls_caldata, puls_channels)
+    #pls_events = map(Broadcast.BroadcastFunction(only), columns(pls_events_pre))
     
+
+    # Cross-system:
+
     system_events = (
         geds = ged_events,
-        spms = lar_events,
-        puls = build_global_events(ds, puls_channels),
+        spms = spm_events,
+        puls = pls_events,
     )
 
-    global_events = build_cross_system_events(system_events)
+    global_events_pre = build_cross_system_events(system_events)
+    single_pls_col = StructVector(map(Broadcast.BroadcastFunction(only), columns(global_events_pre.puls)))
+    global_events = StructVector(merge(columns(global_events_pre), (puls = single_pls_col,)))
 
     cross_systems_cols = (
         ged_spm = _build_lar_cut(global_events),
@@ -78,6 +102,7 @@ function calibrate_all(data::LegendData, sel::ValiditySelection, datastore::Abst
     return result
 end
 export calibrate_all
+
 
 _fix_vov(x) = x
 _fix_vov(x::AbstractVector{<:AbstractVector}) = VectorOfVectors(x)

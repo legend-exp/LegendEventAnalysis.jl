@@ -22,6 +22,7 @@ include("flatten_over_channels.jl")
 include("build_global_events.jl")
 include("calibrate_geds.jl")
 include("calibrate_smps.jl")
+include("calibrate_puls.jl")
 include("calibrate_all.jl")
 
 end # module
