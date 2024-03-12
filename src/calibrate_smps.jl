@@ -8,7 +8,7 @@ Apply the calibration specified by `data` and `sel` for the given SiPM
 
 Also calculates the configured cut/flag values.
 """
-function calibrate_spm_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+function calibrate_spm_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector)
     chdata = channel_data[:]
 
     spmcal_pf = get_spm_cal_propfunc(data, sel, detector)
@@ -69,6 +69,6 @@ function _build_lar_cut(global_events::AbstractVector{<:NamedTuple})
     spmdc = global_events.spms.trig_is_dc
     spm_pe = global_events.spms.trig_pe
     
-    t_wins = @. ClosedInterval(geds_t0 - 1u"μs", geds_t0 + 1u"μs")
+    t_wins = @. ClosedInterval(geds_t0 - 1u"μs", geds_t0 + 5u"μs")
     return StructArray(_lar_cut.(t_wins, spm_t, spmdc, spm_pe))
 end
