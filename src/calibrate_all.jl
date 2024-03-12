@@ -7,7 +7,7 @@
 Calibrate all channels in the given datastore, using the metadata
 processing configuration for `data` and `sel`.
 """
-function calibrate_all(data::LegendData, sel::ValiditySelection, datastore::AbstractDict)
+function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDict)
     ds = datastore
 
     chinfo = channelinfo(data, sel)
@@ -28,29 +28,47 @@ function calibrate_all(data::LegendData, sel::ValiditySelection, datastore::Abst
 
     ged_events_pre = build_global_events(ged_caldata, geds_channels)
 
-    # ToDo: Make isvalid_t0 configurable:
-    function min_t0(t0::AbstractVector{<:Number})
-        isvalid_t0(t0) = 47000u"ns" < t0 < 55000u"ns"
-        invalid_to_inf(t0::Number) = !isvalid_t0(t0) ? typeof(t0)(Inf) : t0
-        mt = minimum(invalid_to_inf, t0)
-        isinf(mt) ? typeof(mt)(NaN) : mt
-    end
+    min_t0(t0::AbstractVector{<:Number}) = isempty(t0) ? eltype(t0)(NaN) : minimum(t0)
 
-    emax_ch = broadcast(ged_events_pre.e_trap_cal) do e_cal
+    max_e_ch = broadcast(ged_events_pre.e_cusp_ctc_cal) do e_cal
         findmax(x -> isnan(x) ? zero(x) : x, e_cal)[2]
     end
 
+    trig_e_ch = findall.(ged_events_pre.is_physical_trig)
+
+    trig_e_trap_cal = _fix_vov(getindex.(ged_events_pre.e_trap_cal, trig_e_ch))
+    trig_e_cusp_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_cal, trig_e_ch))
+    trig_e_zac_cal = _fix_vov(getindex.(ged_events_pre.e_zac_cal, trig_e_ch))
+    trig_e_trap_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_trap_ctc_cal, trig_e_ch))
+    trig_e_cusp_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_ctc_cal, trig_e_ch))
+    trig_e_zac_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_zac_ctc_cal, trig_e_ch))
+    trig_e_short_cal = _fix_vov(getindex.(ged_events_pre.e_short_cal, trig_e_ch))
+    trig_t0 = _fix_vov(getindex.(ged_events_pre.t0, trig_e_ch))
+    n_trig = length.(trig_e_ch)
+    n_expected_baseline = Ref(length(first(ged_events_pre).is_baseline)) .- count.(ged_events_pre.is_baseline)
+    
+
     ged_additional_cols = (
-        t0_start = [min_t0(t0) for t0 in ged_events_pre.t0],
-        multiplicity = [count(e -> (isnan(e) ? zero(e) : e) >= 25u"keV", E) for E in ged_events_pre.e_cusp_cal],
-        emax_ch = emax_ch,
-        emax_isgood = getindex.(ged_events_pre.isgood, emax_ch),
-        emax_trap_cal = getindex.(ged_events_pre.e_trap_cal, emax_ch),
-        emax_cusp_cal = getindex.(ged_events_pre.e_trap_cal, emax_ch),
-        emax_zac_cal = getindex.(ged_events_pre.e_trap_cal, emax_ch),
-        emax_trap_ctc_cal = getindex.(ged_events_pre.e_trap_ctc_cal, emax_ch),
-        emax_cusp_ctc_cal = getindex.(ged_events_pre.e_cusp_ctc_cal, emax_ch),
-        emax_zac_ctc_cal = getindex.(ged_events_pre.e_zac_ctc_cal, emax_ch),
+        t0_start = min_t0.(trig_t0),
+        trig_t0 = trig_t0,
+        multiplicity = n_trig,
+        max_e_ch = max_e_ch,
+        max_e_trap_cal = maximum.(trig_e_trap_cal, init=0u"keV"),
+        max_e_cusp_cal = maximum.(trig_e_cusp_cal, init=0u"keV"),
+        max_e_zac_cal = maximum.(trig_e_zac_cal, init=0u"keV"),
+        max_e_trap_ctc_cal = maximum.(trig_e_trap_ctc_cal, init=0u"keV"),
+        max_e_cusp_ctc_cal = maximum.(trig_e_cusp_ctc_cal, init=0u"keV"),
+        max_e_zac_ctc_cal = maximum.(trig_e_zac_ctc_cal, init=0u"keV"),
+        max_e_short_cal = maximum.(trig_e_short_cal, init=0u"keV"),
+        trig_e_ch = trig_e_ch,
+        trig_e_trap_cal = trig_e_trap_cal,
+        trig_e_cusp_cal = trig_e_cusp_cal,
+        trig_e_zac_cal = trig_e_zac_cal,
+        trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
+        trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
+        trig_e_zac_ctc_cal = trig_e_zac_ctc_cal,
+        trig_e_short_cal = trig_e_short_cal,
+        is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline .&& count.(ged_events_pre.is_physical) .== n_trig,
     )
     ged_events = StructVector(merge(columns(ged_events_pre), ged_additional_cols))
 
