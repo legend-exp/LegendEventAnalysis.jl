@@ -8,7 +8,7 @@ by the `detector` ID to the single-channel `channel_data` for that detector.
 
 Also calculates the configured cut/flag values.
 """
-function calibrate_pls_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+function calibrate_pls_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector)
     chdata = channel_data[:]
 
     pulsercal_pf = get_pulser_cal_propfunc(data, sel, detector)
