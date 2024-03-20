@@ -47,19 +47,20 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     n_trig = length.(trig_e_ch)
     n_expected_baseline = Ref(length(first(ged_events_pre).is_baseline)) .- count.(ged_events_pre.is_baseline)
     
+    maximum_with_init(A) = maximum(A, init=zero(eltype((A))))
 
     ged_additional_cols = (
         t0_start = min_t0.(trig_t0),
         trig_t0 = trig_t0,
         multiplicity = n_trig,
         max_e_ch = max_e_ch,
-        max_e_trap_cal = maximum.(trig_e_trap_cal, init=0u"keV"),
-        max_e_cusp_cal = maximum.(trig_e_cusp_cal, init=0u"keV"),
-        max_e_zac_cal = maximum.(trig_e_zac_cal, init=0u"keV"),
-        max_e_trap_ctc_cal = maximum.(trig_e_trap_ctc_cal, init=0u"keV"),
-        max_e_cusp_ctc_cal = maximum.(trig_e_cusp_ctc_cal, init=0u"keV"),
-        max_e_zac_ctc_cal = maximum.(trig_e_zac_ctc_cal, init=0u"keV"),
-        max_e_short_cal = maximum.(trig_e_short_cal, init=0u"keV"),
+        max_e_trap_cal = maximum_with_init.(trig_e_trap_cal),
+        max_e_cusp_cal = maximum_with_init.(trig_e_cusp_cal),
+        max_e_zac_cal = maximum_with_init.(trig_e_zac_cal),
+        max_e_trap_ctc_cal = maximum_with_init.(trig_e_trap_ctc_cal),
+        max_e_cusp_ctc_cal = maximum_with_init.(trig_e_cusp_ctc_cal),
+        max_e_zac_ctc_cal = maximum_with_init.(trig_e_zac_ctc_cal),
+        max_e_short_cal = maximum_with_init.(trig_e_short_cal),
         trig_e_ch = trig_e_ch,
         trig_e_trap_cal = trig_e_trap_cal,
         trig_e_cusp_cal = trig_e_cusp_cal,

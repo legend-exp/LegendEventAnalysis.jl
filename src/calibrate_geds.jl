@@ -26,6 +26,7 @@ function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection,
         drift_time = $drift_time,
         e_10410 = $e_10410,
         blsigma = $blsigma,
+        blmean = $blmean,
     )
     
     postcal_pf = let aoe_window = LegendDataManagement.dataprod_pars_aoe_window(data, sel, detector)
