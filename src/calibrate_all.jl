@@ -11,9 +11,9 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     ds = datastore
 
     chinfo = channelinfo(data, sel)
-    geds_channels = ChannelId.(filterby(@pf $system == :geds && $processable && $usability != :off)(chinfo).channel)
-    spms_channels = ChannelId.(filterby(@pf $system == :spms && $processable)(chinfo).channel)
-    puls_channels = ChannelId.(filterby(@pf $detector == DetectorId(:PULS01ANA))(chinfo).channel)
+    geds_channels::Vector{ChannelId} = filterby(@pf $system == :geds && $processable && $usability != :off)(chinfo).channel
+    spms_channels::Vector{ChannelId} = filterby(@pf $system == :spms && $processable)(chinfo).channel
+    puls_channels::Vector{ChannelId} = filterby(@pf $system in [:puls, :bsln])(chinfo).channel
 
 
     # HPGe:
@@ -42,10 +42,10 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     trig_e_trap_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_trap_ctc_cal, trig_e_ch))
     trig_e_cusp_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_ctc_cal, trig_e_ch))
     trig_e_zac_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_zac_ctc_cal, trig_e_ch))
-    trig_e_short_cal = _fix_vov(getindex.(ged_events_pre.e_short_cal, trig_e_ch))
+    trig_e_short_cal = _fix_vov(getindex.(ged_events_pre.e_313_cal, trig_e_ch))
     trig_t0 = _fix_vov(getindex.(ged_events_pre.t0, trig_e_ch))
     n_trig = length.(trig_e_ch)
-    n_expected_baseline = Ref(length(first(ged_events_pre).is_baseline)) .- count.(ged_events_pre.is_baseline)
+    n_expected_baseline = length.(ged_events_pre.is_baseline) .- length.(trig_e_ch)
     
     maximum_with_init(A) = maximum(A, init=zero(eltype((A))))
 
@@ -69,7 +69,10 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
         trig_e_zac_ctc_cal = trig_e_zac_ctc_cal,
         trig_e_short_cal = trig_e_short_cal,
-        is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline .&& count.(ged_events_pre.is_physical) .== n_trig,
+        is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline,
+        is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
+        is_saturated = any.(ged_events_pre.is_saturated),
+        is_discharge = any.(ged_events_pre.is_discharge),
     )
     ged_events = StructVector(merge(columns(ged_events_pre), ged_additional_cols))
 
@@ -94,10 +97,9 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
             chdata = ds[channel][:]
             channel => calibrate_pls_channel_data(data, sel, detector, chdata)
         end
-        for channel in puls_channels
+        for channel in puls_channels if haskey(ds, string(channel))
     ])
     pls_events = build_global_events(pls_caldata, puls_channels)
-    #pls_events = map(Broadcast.BroadcastFunction(only), columns(pls_events_pre))
     
 
     # Cross-system:

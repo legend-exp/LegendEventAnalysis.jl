@@ -11,15 +11,17 @@ Also calculates the configured cut/flag values.
 function calibrate_pls_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector)
     chdata = channel_data[:]
 
+    # get calibration function for the detector
     pulsercal_pf = get_pulser_cal_propfunc(data, sel, detector)
 
-    # ToDo: Make channel output configurable:
-    chdata_output = (
-        timestamp = chdata.timestamp,
-        e_10410 = chdata.e_10410,
-        t50 = chdata.t50,
-    )
+    # get additional cols to be parsed into the event tier
+    chdata_output_pf = get_ged_evt_chdata_propfunc(data, sel, detector)
 
+
+    # get additional columns
+    chdata_output = chdata_output_pf.(chdata)
+
+    # apply calibrations
     cal_output = pulsercal_pf.(chdata)
 
     return StructVector(merge(chdata_output, columns(cal_output)))
