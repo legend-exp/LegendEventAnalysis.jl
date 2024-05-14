@@ -18,6 +18,10 @@ using Tables: columns
 
 using LegendDataTypes: fast_flatten
 
+# ToDo: Add this to LegendDataTypes:
+const MaybeWithUnits{T<:Number} = Union{T,Quantity{<:T}}
+const RealQuantity = MaybeWithUnits{<:Real}
+
 include("flatten_over_channels.jl")
 include("build_global_events.jl")
 include("calibrate_geds.jl")
