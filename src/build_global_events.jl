@@ -158,3 +158,43 @@ export build_cross_system_events
 #_similar_empty(x::Number) = typeof(x)(NaN)
 #_similar_empty(x::Integer) = typeof(x)(0)
 #_similar_empty(V::AbstractVector) = similar(V, 0)
+
+
+"""
+    flag_coincidences(
+        timestamps::AbstractVector{<:RealQuantity}, ref_timestamps::AbstractVector{<:RealQuantity};
+        ts_window::Number = 125u"μs"
+    )
+
+Flag coincidences in `timestamps` with respect to `ref_timestamps`.
+
+Return a boolean vector of the same length as `timestamps` that is `true`
+where a timestamp is within `ts_window` of an element of `ref_timestamps` and
+`false` otherwise.
+"""
+function flag_coincidences(
+    timestamps::AbstractVector{<:RealQuantity}, ref_timestamps::AbstractVector{<:RealQuantity};
+    ts_window::Number = 125u"μs"
+)
+    flags = similar(timestamps, Bool)
+    @assert axes(flags) == axes(timestamps)
+    j = firstindex(ref_timestamps)
+    last_j = lastindex(ref_timestamps)
+    ref_ts_a = ref_timestamps[j]
+    j = j < last_j ? j += 1 : j
+    ref_ts_b = ref_timestamps[j]
+    for i in eachindex(timestamps)
+        ts = timestamps[i]
+        delta_t_a = abs(ts - ref_ts_a)
+        delta_t_b = abs(ts - ref_ts_b)
+        if delta_t_b < delta_t_a
+            ref_ts_a = ref_ts_b
+            j = j < last_j ? j += 1 : j
+            ref_ts_b = ref_timestamps[j]
+        end
+        flags[i] = abs(ts - ref_ts_a) < ts_window
+    end
+    return flags
+end
+export flag_coincidences
+
