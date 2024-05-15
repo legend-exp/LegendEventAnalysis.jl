@@ -7,11 +7,11 @@
 Calibrate all channels in the given datastore, using the metadata
 processing configuration for `data` and `sel`.
 """
-function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDict)
+function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDict; tier::DataTierLike=:jldsp)
     ds = datastore
 
     chinfo = channelinfo(data, sel)
-    geds_channels::Vector{ChannelId} = filterby(@pf $system == :geds && $processable && $usability != :off)(chinfo).channel
+    geds_channels::Vector{ChannelId} = filterby(@pf $system == :geds && $processable && $usability != :off && $is_blinded)(chinfo).channel
     spms_channels::Vector{ChannelId} = filterby(@pf $system == :spms && $processable)(chinfo).channel
     puls_channels::Vector{ChannelId} = filterby(@pf $system in [:puls, :bsln])(chinfo).channel
 
@@ -20,7 +20,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     ged_caldata = Dict([
         let detector = channelinfo(data, sel, channel).detector,
-            chdata = ds[channel][:]
+            chdata = ds[channel, tier][:]
             channel => calibrate_ged_channel_data(data, sel, detector, chdata)
         end
         for channel in geds_channels
@@ -38,10 +38,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     trig_e_trap_cal = _fix_vov(getindex.(ged_events_pre.e_trap_cal, trig_e_ch))
     trig_e_cusp_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_cal, trig_e_ch))
-    trig_e_zac_cal = _fix_vov(getindex.(ged_events_pre.e_zac_cal, trig_e_ch))
     trig_e_trap_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_trap_ctc_cal, trig_e_ch))
     trig_e_cusp_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_ctc_cal, trig_e_ch))
-    trig_e_zac_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_zac_ctc_cal, trig_e_ch))
     trig_e_short_cal = _fix_vov(getindex.(ged_events_pre.e_313_cal, trig_e_ch))
     trig_t0 = _fix_vov(getindex.(ged_events_pre.t0, trig_e_ch))
     n_trig = length.(trig_e_ch)
@@ -56,18 +54,14 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         max_e_ch = max_e_ch,
         max_e_trap_cal = maximum_with_init.(trig_e_trap_cal),
         max_e_cusp_cal = maximum_with_init.(trig_e_cusp_cal),
-        max_e_zac_cal = maximum_with_init.(trig_e_zac_cal),
         max_e_trap_ctc_cal = maximum_with_init.(trig_e_trap_ctc_cal),
         max_e_cusp_ctc_cal = maximum_with_init.(trig_e_cusp_ctc_cal),
-        max_e_zac_ctc_cal = maximum_with_init.(trig_e_zac_ctc_cal),
         max_e_short_cal = maximum_with_init.(trig_e_short_cal),
         trig_e_ch = trig_e_ch,
         trig_e_trap_cal = trig_e_trap_cal,
         trig_e_cusp_cal = trig_e_cusp_cal,
-        trig_e_zac_cal = trig_e_zac_cal,
         trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
         trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
-        trig_e_zac_ctc_cal = trig_e_zac_ctc_cal,
         trig_e_short_cal = trig_e_short_cal,
         is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline,
         is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
@@ -81,7 +75,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     spm_caldata = Dict([
         let detector = channelinfo(data, sel, channel).detector,
-            chdata = ds[channel][:]
+            chdata = ds[channel, tier][:]
             channel => calibrate_spm_channel_data(data, sel, detector, chdata)
         end
         for channel in spms_channels
@@ -94,7 +88,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     pls_caldata = Dict([
         let detector = channelinfo(data, sel, channel).detector,
-            chdata = ds[channel][:]
+            chdata = ds[channel, tier][:]
             channel => calibrate_pls_channel_data(data, sel, detector, chdata)
         end
         for channel in puls_channels if haskey(ds, string(channel))
