@@ -12,7 +12,7 @@ using LegendDataManagement
 
 using IntervalSets: AbstractInterval, ClosedInterval, leftendpoint, rightendpoint
 using ProgressMeter: @showprogress
-using PropertyFunctions: PropertyFunction, @pf, filterby
+using PropertyFunctions: PropertyFunction, @pf, filterby, PropSelFunction
 
 using Tables: columns
 
