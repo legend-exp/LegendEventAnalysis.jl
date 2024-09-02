@@ -19,7 +19,6 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     aux_channels::Vector{ChannelId} = filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).channel
     @debug "Loaded auxiliary channels: $(join(string.(filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).detector), ", "))"
 
-    # Main.@infiltrate
     # HPGe:
     @debug "Calibrating HPGe channels"
     ged_kwargs = get_ged_evt_kwargs(data, sel)
