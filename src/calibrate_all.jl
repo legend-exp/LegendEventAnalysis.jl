@@ -14,6 +14,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     chinfo = channelinfo(data, sel)
     geds_channels::Vector{ChannelId} = filterby(get_ged_evt_chsel_propfunc(data, sel))(chinfo).channel
     @debug "Loaded $(length(geds_channels)) HPGe channels"
+    hitgeds_channels::Vector{ChannelId} = filterby(get_ged_evt_hitchsel_propfunc(data, sel))(chinfo).channel
+    @debug "Loaded $(length(hitgeds_channels)) HPGe hit channels"
     spms_channels::Vector{ChannelId} = filterby(get_spms_evt_chsel_propfunc(data, sel))(chinfo).channel
     @debug "Loaded $(length(spms_channels)) SiPM channels"
     aux_channels::Vector{ChannelId} = filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).channel
@@ -52,23 +54,29 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     
     maximum_with_init(A) = maximum(A, init=zero(eltype((A))))
 
+    is_valid_hit(trig_chs::AbstractVector{<:Int}, hit_channels::AbstractVector{<:Int}) = all(x -> x in hit_channels, trig_chs)
+    # Main.@infiltrate
+
     ged_additional_cols = (
         t0_start = min_t0.(trig_t0),
         trig_t0 = trig_t0,
         multiplicity = n_trig,
-        max_e_ch = max_e_ch,
+        max_e_ch_idxs = max_e_ch,
+        max_e_ch = only.(getindex.(ged_events_pre.channel, max_e_ch)),
         max_e_trap_cal = maximum_with_init.(trig_e_trap_cal),
         max_e_cusp_cal = maximum_with_init.(trig_e_cusp_cal),
         max_e_trap_ctc_cal = maximum_with_init.(trig_e_trap_ctc_cal),
         max_e_cusp_ctc_cal = maximum_with_init.(trig_e_cusp_ctc_cal),
         max_e_short_cal = maximum_with_init.(trig_e_short_cal),
-        trig_e_ch = trig_e_ch,
+        trig_e_ch_idxs = trig_e_ch,
+        trig_e_ch = getindex.(ged_events_pre.channel, trig_e_ch),
         trig_e_trap_cal = trig_e_trap_cal,
         trig_e_cusp_cal = trig_e_cusp_cal,
         trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
         trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
         trig_e_short_cal = trig_e_short_cal,
         is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline,
+        is_valid_hit = is_valid_hit.(getindex.(ged_events_pre.channel, trig_e_ch), Ref(Int.(hitgeds_channels))),
         is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
         is_saturated = any.(ged_events_pre.is_saturated),
         is_discharge = any.(ged_events_pre.is_discharge),
