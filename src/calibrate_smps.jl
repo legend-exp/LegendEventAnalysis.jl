@@ -62,7 +62,7 @@ function _lar_cut(
 
     lar_cut = n_over_thresh >= 4 || pe_sum >= 4
 
-    return (lar_cut = lar_cut, spms_win_pe_sum, spms_win_multiplicity = n_over_thresh)
+    return (lar_cut = lar_cut, spms_win_pe_sum = pe_sum, spms_win_multiplicity = n_over_thresh)
 end
 
 
