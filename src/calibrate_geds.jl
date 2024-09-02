@@ -1,7 +1,9 @@
 # This file is a part of LegendEventAnalysis.jl, licensed under the MIT License (MIT).
 
 """
-    calibrate_ged_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+    calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector; 
+        psd_cal_pars_type::Symbol=:ppars, psd_cal_pars_cat::Symbol=:aoe, psd_cut_pars_type::Symbol=:ppars, psd_cut_pars_cat::Symbol=:aoe,
+        keep_chdata::Bool=false)
 
 Apply the calibration specified by `data` and `sel` for the given HPGe
 `detector` to the single-channel `channel_data` for that detector.
@@ -31,7 +33,7 @@ function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection,
     chdata_output_pf = if keep_chdata
         PropSelFunction{propertynames(chdata)}()
     else
-        get_ged_evt_chdata_propfunc(data, sel, detector)
+        get_ged_evt_chdata_propfunc(data, sel)
     end
     
     # get postcal psd flags
