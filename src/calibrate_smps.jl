@@ -8,21 +8,25 @@ Apply the calibration specified by `data` and `sel` for the given SiPM
 
 Also calculates the configured cut/flag values.
 """
-function calibrate_spm_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+function calibrate_spm_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector; 
+    keep_chdata::Bool=false)
     chdata = channel_data[:]
 
     spmcal_pf = get_spm_cal_propfunc(data, sel, detector)
 
-    # ToDo: Make channel output configurable:
-    chdata_output = (
-        timestamp = chdata.timestamp,
-        trig_pos = VectorOfArrays(chdata.trig_pos),
-    )
+    # get additional cols to be parsed into the event tier
+    chdata_output_pf = if keep_chdata
+        PropSelFunction{propertynames(chdata)}()
+    else
+        get_spms_evt_chdata_propfunc(data, sel)
+    end
 
     cal_output_novv = spmcal_pf.(chdata)
     cal_output = StructArray(map(VectorOfArrays, columns(cal_output_novv)))
 
-    return StructVector(merge(chdata_output, columns(cal_output)))
+    chdata_output = chdata_output_pf.(chdata)
+
+    return StructVector(merge(columns(cal_output), columns(chdata_output)))
 end
 export calibrate_spm_channel_data
 
@@ -58,7 +62,7 @@ function _lar_cut(
 
     lar_cut = n_over_thresh >= 4 || pe_sum >= 4
 
-    return (lar_cut = lar_cut, smps_win_pe_sum = pe_sum)
+    return (lar_cut = lar_cut, spms_win_pe_sum = pe_sum, spms_win_multiplicity = n_over_thresh)
 end
 
 
