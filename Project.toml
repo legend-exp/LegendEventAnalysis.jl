@@ -1,6 +1,6 @@
 name = "LegendEventAnalysis"
 uuid = "ca666546-4c2a-41e4-9648-72713d810efe"
-version = "0.1.1"
+version = "0.1.2"
 
 [deps]
 ArraysOfArrays = "65a8f2f4-9b39-5baf-92e2-a9cc46fdf018"
@@ -22,5 +22,5 @@ ProgressMeter = "1"
 PropertyFunctions = "0.2.1"
 StructArrays = "0.4, 0.5, 0.6"
 Tables = "1"
-Unitful = "1"
+Unitful = "1.6"
 julia = "1.10"
