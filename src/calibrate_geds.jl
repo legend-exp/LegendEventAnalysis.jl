@@ -10,10 +10,12 @@ Apply the calibration specified by `data` and `sel` for the given HPGe
 
 Also calculates the configured cut/flag values.
 """
-function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector; 
+function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorIdLike, channel_data::AbstractVector; 
         psd_cal_pars_type::Symbol=:ppars, psd_cal_pars_cat::Symbol=:aoe, psd_cut_pars_type::Symbol=:ppars, psd_cut_pars_cat::Symbol=:aoe,
         keep_chdata::Bool=false)
     
+    detector = DetectorId(detector)
+
     # get all chdata
     chdata = channel_data[:]
 
@@ -67,3 +69,6 @@ function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection,
     return StructVector(merge(columns(chdata_output), columns(cal_output), columns(psd_output), columns(postcal_data), columns(cut_output), additional_cols))
 end
 export calibrate_ged_channel_data
+
+calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorIdLike, tier::DataTierLike; kwargs...) =
+    calibrate_ged_channel_data(data, sel, detector, read_ldata(data, tier, sel, detector), kwargs...)
