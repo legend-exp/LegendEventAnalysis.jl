@@ -16,7 +16,7 @@ Unitful = "1986cc42-f94f-5a68-af5c-568840ba703d"
 [compat]
 ArraysOfArrays = "0.6.5"
 IntervalSets = "0.6, 0.7"
-LegendDataManagement = "0.2.7, 0.3, 0.4"
+LegendDataManagement = "0.4"
 LegendDataTypes = "0.1.4"
 ProgressMeter = "1"
 PropertyFunctions = "0.2.1"
