@@ -11,6 +11,7 @@ Apply the calibration specified by `data` and `sel` for the given HPGe
 Also calculates the configured cut/flag values.
 """
 function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorIdLike, channel_data::AbstractVector; 
+        e_cal_pars_type::Symbol=:rpars, e_cal_pars_cat::Symbol=:ecal,
         psd_cal_pars_type::Symbol=:ppars, psd_cal_pars_cat::Symbol=:aoe, psd_cut_pars_type::Symbol=:ppars, psd_cut_pars_cat::Symbol=:aoe,
         keep_chdata::Bool=false)
     
@@ -20,7 +21,7 @@ function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection,
     chdata = channel_data[:]
 
     # get energy and psd calibration functions for the detector
-    cal_pf = get_ged_cal_propfunc(data, sel, detector)
+    cal_pf = get_ged_cal_propfunc(data, sel, detector; pars_type=e_cal_pars_type, pars_cat=e_cal_pars_cat)
     psd_pf = get_ged_psd_propfunc(data, sel, detector; pars_type=psd_cal_pars_type, pars_cat=psd_cal_pars_cat)
 
     # get qc labels
