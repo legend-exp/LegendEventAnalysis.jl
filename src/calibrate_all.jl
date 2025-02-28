@@ -43,11 +43,11 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     trig_e_ch = findall.(ged_events_pre.is_physical_trig)
 
-    trig_e_trap_cal = _fix_vov(getindex.(ged_events_pre.e_trap_cal, trig_e_ch))
-    trig_e_cusp_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_cal, trig_e_ch))
+    trig_e_trap_max_cal = _fix_vov(getindex.(ged_events_pre.e_trap_max_cal, trig_e_ch))
+    trig_e_cusp_max_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_max_cal, trig_e_ch))
     trig_e_trap_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_trap_ctc_cal, trig_e_ch))
     trig_e_cusp_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_ctc_cal, trig_e_ch))
-    trig_e_short_cal = _fix_vov(getindex.(ged_events_pre.e_313_cal, trig_e_ch))
+    trig_e_535_cal      = _fix_vov(getindex.(ged_events_pre.e_535_cal, trig_e_ch))
     trig_t0 = _fix_vov(getindex.(ged_events_pre.t0, trig_e_ch))
     n_trig = length.(trig_e_ch)
     n_expected_baseline = length.(ged_events_pre.is_baseline) .- length.(trig_e_ch)
@@ -55,7 +55,6 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     maximum_with_init(A) = maximum(A, init=zero(eltype((A))))
 
     is_valid_hit(trig_chs::AbstractVector{<:Int}, hit_channels::AbstractVector{<:Int}) = all(x -> x in hit_channels, trig_chs)
-    # Main.@infiltrate
 
     ged_additional_cols = (
         t0_start = min_t0.(trig_t0),
@@ -63,18 +62,18 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         multiplicity = n_trig,
         max_e_ch_idxs = max_e_ch,
         max_e_ch = only.(getindex.(ged_events_pre.channel, max_e_ch)),
-        max_e_trap_cal = maximum_with_init.(trig_e_trap_cal),
-        max_e_cusp_cal = maximum_with_init.(trig_e_cusp_cal),
+        max_e_trap_cal = maximum_with_init.(trig_e_trap_max_cal),
+        max_e_cusp_cal = maximum_with_init.(trig_e_cusp_max_cal),
         max_e_trap_ctc_cal = maximum_with_init.(trig_e_trap_ctc_cal),
         max_e_cusp_ctc_cal = maximum_with_init.(trig_e_cusp_ctc_cal),
-        max_e_short_cal = maximum_with_init.(trig_e_short_cal),
+        max_e_short_cal = maximum_with_init.(trig_e_535_cal),
         trig_e_ch_idxs = trig_e_ch,
         trig_e_ch = getindex.(ged_events_pre.channel, trig_e_ch),
-        trig_e_trap_cal = trig_e_trap_cal,
-        trig_e_cusp_cal = trig_e_cusp_cal,
+        trig_e_trap_max_cal = trig_e_trap_max_cal,
+        trig_e_cusp_max_cal = trig_e_cusp_max_cal,
         trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
         trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
-        trig_e_short_cal = trig_e_short_cal,
+        trig_e_535_cal = trig_e_535_cal,
         is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline,
         is_valid_hit = is_valid_hit.(getindex.(ged_events_pre.channel, trig_e_ch), Ref(Int.(hitgeds_channels))),
         is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
@@ -122,7 +121,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     global_events = StructVector(merge(Base.structdiff(columns(global_events_pre), NamedTuple{keys(aux_events)}), (aux = StructArray(aux_cols),)))
 
     cross_systems_cols = (
-        ged_spm = _build_lar_cut(global_events),
+        ged_spm = _build_lar_cut(data, sel, global_events),
     )
 
     result = StructArray(merge(columns(global_events), cross_systems_cols))
