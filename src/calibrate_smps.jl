@@ -13,6 +13,8 @@ function calibrate_spm_channel_data(data::LegendData, sel::AnyValiditySelection,
     chdata = channel_data[:]
 
     spmcal_pf = get_spm_cal_propfunc(data, sel, detector)
+    spmdc_sel_pf = get_spm_dc_sel_propfunc(data, sel, detector)
+    spmdc_cal_pf = get_spm_dc_cal_propfunc(data, sel, detector)
 
     # get additional cols to be parsed into the event tier
     chdata_output_pf = if keep_chdata
@@ -24,9 +26,12 @@ function calibrate_spm_channel_data(data::LegendData, sel::AnyValiditySelection,
     cal_output_novv = spmcal_pf.(chdata)
     cal_output = StructArray(map(VectorOfArrays, columns(cal_output_novv)))
 
+    dc_output_novv = NamedTuple{keys(spmdc_sel_pf)}([spmdc_cal_pf[e_type].(spmdc_sel_pf[e_type].(chdata)) for e_type in keys(spmdc_sel_pf)])
+    dc_output = StructArray(map(VectorOfArrays, columns(dc_output_novv)))
+
     chdata_output = chdata_output_pf.(chdata)
 
-    return StructVector(merge(columns(cal_output), columns(chdata_output)))
+    return StructVector(merge(columns(cal_output), columns(dc_output), columns(chdata_output)))
 end
 export calibrate_spm_channel_data
 
