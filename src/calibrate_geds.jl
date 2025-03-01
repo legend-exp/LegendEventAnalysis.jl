@@ -40,7 +40,7 @@ function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection,
     end
     
     # get postcal psd flags
-    postcal_pf = get_ged_aoe_cut_propfunc(data, sel, detector; pars_type=psd_cut_pars_type, pars_cat=psd_cut_pars_cat)
+    aoecut_pf = get_ged_aoe_cut_propfunc(data, sel, detector; pars_type=psd_cut_pars_type, pars_cat=psd_cut_pars_cat)
     
     # apply calibrations 
     cal_output = cal_pf.(chdata)
@@ -51,7 +51,7 @@ function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection,
     cut_output = cut_pf.(cal_chdata)
 
     # get postcal data
-    postcal_data = postcal_pf.(cal_chdata)
+    postcal_data = aoecut_pf.(cal_chdata)
 
     # get additional columns 
     chdata_output = chdata_output_pf.(chdata)
