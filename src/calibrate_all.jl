@@ -76,6 +76,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         trig_e_535_cal = trig_e_535_cal,
         is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline,
         is_valid_hit = is_valid_hit.(getindex.(ged_events_pre.channel, trig_e_ch), Ref(Int.(hitgeds_channels))),
+        is_valid_psd = all.(getindex.(ged_events_pre.psd_classifier, trig_e_ch)),
         is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
         is_saturated = any.(ged_events_pre.is_saturated),
         is_discharge = any.(ged_events_pre.is_discharge),
