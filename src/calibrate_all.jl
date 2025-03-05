@@ -60,7 +60,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     hit_properties = get_ged_evt_is_valid_hit_properties(data, sel)
     is_valid_hit = trues(length(ged_events_pre.channel))
     for prop in hit_properties
-        is_valid_hit = is_valid_hit .&& all.(map.(isfinite, (getindex.(getproperty(ged_events_pre, prop), trig_e_ch))))
+        is_valid_hit .&= all.(map.(isfinite, (getindex.(getproperty(ged_events_pre, prop), trig_e_ch))))
     end
 
     ged_additional_cols = (
