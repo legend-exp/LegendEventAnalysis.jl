@@ -94,11 +94,12 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     # SiPM:
     @debug "Calibrating SiPM channels"
+    spm_kwargs = get_spms_evt_kwargs(data, sel)
     spm_caldata_v = Vector{StructVector}(undef, length(spms_channels))
     Threads.@threads for i in eachindex(spms_channels)
         let detector = channelinfo(data, sel, spms_channels[i]).detector, chdata = ds[spms_channels[i], tier][:]
             @debug "Calibrating SiPM channel $(detector)"
-            spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata)
+            spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata; spm_kwargs...)
         end
     end
     spm_caldata = Dict(spms_channels .=> spm_caldata_v)
