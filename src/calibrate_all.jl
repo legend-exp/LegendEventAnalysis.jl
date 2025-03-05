@@ -27,6 +27,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     ged_caldata_v = Vector{StructVector}(undef, length(geds_channels))
     Threads.@threads for i in eachindex(geds_channels)
         let detector = channelinfo(data, sel, geds_channels[i]).detector, chdata = ds[geds_channels[i], tier][:]
+            @debug "Calibrating HPGe channel $(detector)"
             ged_caldata_v[i] = calibrate_ged_channel_data(data, sel, detector, chdata; ged_kwargs...)
         end
     end
@@ -54,7 +55,13 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     
     maximum_with_init(A) = maximum(A, init=zero(eltype((A))))
 
-    is_valid_hit(trig_chs::AbstractVector{<:Int}, hit_channels::AbstractVector{<:Int}) = all(x -> x in hit_channels, trig_chs)
+    is_valid_trig(trig_chs::AbstractVector{<:Int}, hit_channels::AbstractVector{<:Int}) = all(x -> x in hit_channels, trig_chs)
+    
+    hit_properties = get_ged_evt_is_valid_hit_properties(data, sel)
+    is_valid_hit = trues(length(ged_events_pre.channel))
+    for prop in hit_properties
+        is_valid_hit .&= all.(map.(isfinite, (getindex.(getproperty(ged_events_pre, prop), trig_e_ch))))
+    end
 
     ged_additional_cols = (
         t0_start = min_t0.(trig_t0),
@@ -75,7 +82,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
         trig_e_535_cal = trig_e_535_cal,
         is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline,
-        is_valid_hit = is_valid_hit.(getindex.(ged_events_pre.channel, trig_e_ch), Ref(Int.(hitgeds_channels))),
+        is_valid_trig = is_valid_trig.(getindex.(ged_events_pre.channel, trig_e_ch), Ref(Int.(hitgeds_channels))),
+        is_valid_hit = is_valid_hit,
         is_valid_psd = all.(getindex.(ged_events_pre.psd_classifier, trig_e_ch)),
         is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
         is_saturated = any.(ged_events_pre.is_saturated),
@@ -89,6 +97,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     spm_caldata_v = Vector{StructVector}(undef, length(spms_channels))
     Threads.@threads for i in eachindex(spms_channels)
         let detector = channelinfo(data, sel, spms_channels[i]).detector, chdata = ds[spms_channels[i], tier][:]
+            @debug "Calibrating SiPM channel $(detector)"
             spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata)
         end
     end
