@@ -93,10 +93,11 @@ end
 function _build_muon_evt_cut(data::LegendData, sel::AnyValiditySelection, global_events::AbstractVector{<:NamedTuple}, pmt_events::AbstractVector{<:NamedTuple})
     output_colnames = (:timestamp, :pe_cal, :multiplicity)
     cutout_colnames = (:is_valid_muon, :n_hit_window)
+    colnames_types = Tuple{Bool, Int, Quantity{<:Real}, Quantity{<:Real}, Int}
     if isempty(pmt_events)
-        return StructArray(fill(NamedTuple{(cutout_colnames..., output_colnames...)}([true, 0, 0.0u"s", 0.0u"e_au", 0]), length(global_events)))
+        return StructArray(fill(NamedTuple{(cutout_colnames..., output_colnames...), colnames_types}([true, 0, NaN*u"s", 0.0u"e_au", 0]), length(global_events)))
     elseif count(.!pmt_events.is_valid_muon) == 0
-        return StructArray(fill(NamedTuple{(cutout_colnames..., output_colnames...)}([true, 0, 0.0u"s", 0.0u"e_au", 0]), length(global_events)))
+        return StructArray(fill(NamedTuple{(cutout_colnames..., output_colnames...), colnames_types}([true, 0, NaN*u"s", 0.0u"e_au", 0]), length(global_events)))
     end
     geds_t0_absolute = global_events.tstart .+ global_events.geds.t0_start
     
