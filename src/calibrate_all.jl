@@ -18,6 +18,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     @debug "Loaded $(length(hitgeds_channels)) HPGe hit channels"
     spms_channels::Vector{ChannelId} = filterby(get_spms_evt_chsel_propfunc(data, sel))(chinfo).channel
     @debug "Loaded $(length(spms_channels)) SiPM channels"
+    pmts_channels::Vector{ChannelId} = filterby(get_pmts_evt_chsel_propfunc(data, sel))(chinfo).channel
+    @debug "Loaded $(length(pmts_channels)) PMT channels"
     aux_channels::Vector{ChannelId} = filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).channel
     @debug "Loaded auxiliary channels: $(join(string.(filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).detector), ", "))"
 
@@ -25,10 +27,11 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     @debug "Calibrating HPGe channels"
     ged_kwargs = get_ged_evt_kwargs(data, sel)
     ged_caldata_v = Vector{StructVector}(undef, length(geds_channels))
+    p = Progress(length(geds_channels); desc="Calibrating HPGe channels...")
     Threads.@threads for i in eachindex(geds_channels)
         let detector = channelinfo(data, sel, geds_channels[i]).detector, chdata = ds[geds_channels[i], tier][:]
-            @debug "Calibrating HPGe channel $(detector)"
             ged_caldata_v[i] = calibrate_ged_channel_data(data, sel, detector, chdata; ged_kwargs...)
+            next!(p; showvalues = [("Calibrated detector", detector)])
         end
     end
     ged_caldata = Dict(geds_channels .=> ged_caldata_v)
@@ -94,11 +97,13 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     # SiPM:
     @debug "Calibrating SiPM channels"
+    spm_kwargs = get_spms_evt_kwargs(data, sel)
     spm_caldata_v = Vector{StructVector}(undef, length(spms_channels))
+    p = Progress(length(geds_channels); desc="Calibrating SiPM channels...")
     Threads.@threads for i in eachindex(spms_channels)
         let detector = channelinfo(data, sel, spms_channels[i]).detector, chdata = ds[spms_channels[i], tier][:]
-            @debug "Calibrating SiPM channel $(detector)"
-            spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata)
+            spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata; spm_kwargs...)
+            next!(p; showvalues = [("Calibrated detector", detector)])
         end
     end
     spm_caldata = Dict(spms_channels .=> spm_caldata_v)
@@ -106,7 +111,30 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     spm_events_novov = build_global_events(spm_caldata, spms_channels)
     spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
 
-    
+    # PMT:
+    pmt_events = if all(.!haskey.(Ref(ds), pmts_channels))
+        @warn "No PMT data found, skip PMT calibration"
+        Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
+    else
+        @debug "Calibrating PMT channels"
+        pmt_kwargs = get_pmts_evt_kwargs(data, sel)
+        pmt_caldata_v = Vector{StructVector}(undef, length(pmts_channels))
+        p = Progress(length(pmts_channels); desc="Calibrating PMT channels...")
+        Threads.@threads for i in eachindex(pmts_channels)
+            let detector = channelinfo(data, sel, pmts_channels[i]).detector, chdata = ds[pmts_channels[i], tier][:]
+                pmt_caldata_v[i] = calibrate_pmt_channel_data(data, sel, detector, chdata; pmt_kwargs...)
+                next!(p; showvalues = [("Calibrated detector", detector)])
+            end
+        end
+        pmt_caldata = Dict(pmts_channels .=> pmt_caldata_v)
+        @debug "Building global events for PMT channels"
+        pmt_events_pre_novov = build_global_events(pmt_caldata, pmts_channels)
+        pmt_events_pre = StructArray(map(_fix_vov, columns(pmt_events_pre_novov)))
+
+        StructVector(merge(columns(_build_muon_cut(data, sel, pmt_events_pre)), columns(pmt_events_pre)))
+    end
+
+
     @debug "Calibrating auxiliary channels"
     # aux & Forced Trigger
     aux_caldata = 
@@ -132,11 +160,13 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     cross_systems_cols = (
         ged_spm = _build_lar_cut(data, sel, global_events),
+        ged_pmt = _build_muon_evt_cut(data, sel, global_events, pmt_events)
     )
 
     result = StructArray(merge(columns(global_events), cross_systems_cols))
     
-    return result
+    result_t = Table(NamedTuple{propertynames(result)}([if c isa StructArray Table(c) else c end for c in columns(result)]))
+    return result_t, Table(pmt_events)
 end
 export calibrate_all
 

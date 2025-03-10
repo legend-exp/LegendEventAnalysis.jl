@@ -8,13 +8,14 @@ Apply the calibration specified by `data` and `sel` for the given SiPM
 
 Also calculates the configured cut/flag values.
 """
-function calibrate_spm_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector; 
+function calibrate_spm_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector;
+    e_cal_pars_type::Symbol=:ppars, e_cal_pars_cat::Symbol=:sipmcal, dc_cut_pars_type::Symbol=:ppars,
     keep_chdata::Bool=false)
     chdata = channel_data[:]
 
-    spmcal_pf = get_spm_cal_propfunc(data, sel, detector)
-    spmdc_sel_pf = get_spm_dc_sel_propfunc(data, sel, detector)
-    spmdc_cal_pf = get_spm_dc_cal_propfunc(data, sel, detector)
+    spmcal_pf = get_spm_cal_propfunc(data, sel, detector; pars_type=e_cal_pars_type, pars_cat=e_cal_pars_cat)
+    spmdc_sel_pf = get_spm_dc_sel_propfunc(data, sel, detector; pars_type=dc_cut_pars_type)
+    spmdc_cal_pf = get_spm_dc_cal_propfunc(data, sel, detector; pars_type=dc_cut_pars_type)
 
     # get additional cols to be parsed into the event tier
     chdata_output_pf = if keep_chdata
