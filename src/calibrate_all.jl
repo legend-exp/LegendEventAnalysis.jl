@@ -112,22 +112,27 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
 
     # PMT:
-    @debug "Calibrating PMT channels"
-    pmt_kwargs = get_pmts_evt_kwargs(data, sel)
-    pmt_caldata_v = Vector{StructVector}(undef, length(pmts_channels))
-    p = Progress(length(pmts_channels); desc="Calibrating PMT channels...")
-    Threads.@threads for i in eachindex(pmts_channels)
-        let detector = channelinfo(data, sel, pmts_channels[i]).detector, chdata = ds[pmts_channels[i], tier][:]
-            pmt_caldata_v[i] = calibrate_pmt_channel_data(data, sel, detector, chdata; pmt_kwargs...)
-            next!(p; showvalues = [("Calibrated detector", detector)])
+    pmt_events = if all(.!haskey.(Ref(ds), pmts_channels))
+        @warn "No PMT data found, skip PMT calibration"
+        Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
+    else
+        @debug "Calibrating PMT channels"
+        pmt_kwargs = get_pmts_evt_kwargs(data, sel)
+        pmt_caldata_v = Vector{StructVector}(undef, length(pmts_channels))
+        p = Progress(length(pmts_channels); desc="Calibrating PMT channels...")
+        Threads.@threads for i in eachindex(pmts_channels)
+            let detector = channelinfo(data, sel, pmts_channels[i]).detector, chdata = ds[pmts_channels[i], tier][:]
+                pmt_caldata_v[i] = calibrate_pmt_channel_data(data, sel, detector, chdata; pmt_kwargs...)
+                next!(p; showvalues = [("Calibrated detector", detector)])
+            end
         end
-    end
-    pmt_caldata = Dict(pmts_channels .=> pmt_caldata_v)
-    @debug "Building global events for PMT channels"
-    pmt_events_pre_novov = build_global_events(pmt_caldata, pmts_channels)
-    pmt_events_pre = StructArray(map(_fix_vov, columns(pmt_events_pre_novov)))
+        pmt_caldata = Dict(pmts_channels .=> pmt_caldata_v)
+        @debug "Building global events for PMT channels"
+        pmt_events_pre_novov = build_global_events(pmt_caldata, pmts_channels)
+        pmt_events_pre = StructArray(map(_fix_vov, columns(pmt_events_pre_novov)))
 
-    pmt_events = StructVector(merge(columns(_build_muon_cut(data, sel, pmt_events_pre)), columns(pmt_events_pre)))
+        StructVector(merge(columns(_build_muon_cut(data, sel, pmt_events_pre)), columns(pmt_events_pre)))
+    end
 
 
     @debug "Calibrating auxiliary channels"
