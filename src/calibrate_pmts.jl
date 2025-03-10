@@ -112,5 +112,5 @@ function _build_muon_evt_cut(data::LegendData, sel::AnyValiditySelection, global
 
     empty_evt::typeof(first(pmt_events_trig)) = typeof(first(pmt_events_trig))([zero(first(pmt_events_trig)[k]) for k in keys(first(pmt_events_trig))])
 
-    return StructArray(_muon_evt_cut.(t_wins, Ref(pmt_events.tstart), Ref(pmt_events_trig), Ref(empty_evt)))
+    return StructArray(_muon_evt_cut.(t_wins, Ref(pmt_events_trig.timestamp), Ref(pmt_events_trig), Ref(empty_evt)))
 end
