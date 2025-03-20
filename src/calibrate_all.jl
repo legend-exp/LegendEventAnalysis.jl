@@ -112,7 +112,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
 
     # PMT:
-    pmt_events = if all(.!haskey.(Ref(ds), pmts_channels))
+    pmt_events = if all(.!haskey.(Ref(ds), string.(pmts_channels)))
         @warn "No PMT data found, skip PMT calibration"
         Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
     else
