@@ -174,3 +174,4 @@ export calibrate_all
 _fix_vov(x) = x
 _fix_vov(x::AbstractVector{<:AbstractVector}) = VectorOfVectors(x)
 _fix_vov(x::VectorOfVectors{<:AbstractVector}) = VectorOfVectors(VectorOfVectors(flatview(x)), x.elem_ptr)
+_fix_vov(t::Table) = Table(NamedTuple{propertynames(t)}([if c isa Table Table(StructArray(map(_fix_vov, columns(c)))) else c end for c in columns(t)]))
