@@ -72,9 +72,7 @@ function _lar_cut(
     return NamedTuple{colnames, Tuple{Bool, eltype(eltype(spm_pe)), Int}}([lar_cut, pe_sum, n_over_thresh])
 end
 
-function _build_lar_cut(data::LegendData, sel::AnyValiditySelection, global_events::AbstractVector{<:NamedTuple}, e_filter::Symbol)
-    geds_t0 = global_events.geds.t0_start
-
+function _build_lar_cut(data::LegendData, sel::AnyValiditySelection, global_events::AbstractVector{<:NamedTuple}, geds_t0::AbstractVector{<:Unitful.Time{<:Real}}, e_filter::Symbol)
     dataprod_larcut = get_spms_evt_lar_cut_props(data, sel)
     dataprod_larcut_filter = dataprod_larcut.energy_types[e_filter]
 
@@ -94,12 +92,12 @@ function _build_lar_cut(data::LegendData, sel::AnyValiditySelection, global_even
     return StructArray(_lar_cut.(Ref(colnames), t_wins, spm_t, spmdc, spm_pe, Ref(pe_ch_threshold), Ref(pe_sum_threshold), Ref(multiplicity_threshold)))
 end
 
-function _build_lar_cut(data::LegendData, sel::AnyValiditySelection, global_events::AbstractVector{<:NamedTuple})
+function _build_lar_cut(data::LegendData, sel::AnyValiditySelection, global_events::AbstractVector{<:NamedTuple}, geds_t0::AbstractVector{<:Unitful.Time{<:Real}})
     dataprod_larcut = get_spms_evt_lar_cut_props(data, sel)
     energy_types = keys(dataprod_larcut.energy_types)
 
     is_valid_lar_propfunc = ljl_propfunc(dataprod_larcut.is_valid_lar)
     
-    lar_cut = StructArray(merge(columns.(_build_lar_cut.(Ref(data), Ref(sel), Ref(global_events), energy_types))...))
+    lar_cut = StructArray(merge(columns.(_build_lar_cut.(Ref(data), Ref(sel), Ref(global_events), Ref(geds_t0), energy_types))...))
     return StructArray(merge((is_valid_lar = is_valid_lar_propfunc.(lar_cut),), columns(lar_cut)))
 end
