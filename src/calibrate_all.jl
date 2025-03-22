@@ -159,7 +159,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     global_events = StructVector(merge(Base.structdiff(columns(global_events_pre), NamedTuple{keys(aux_events)}), (aux = StructArray(aux_cols),)))
 
     cross_systems_cols = (
-        ged_spm = _build_lar_cut(data, sel, global_events),
+        ged_spm = _build_lar_cut(data, sel, global_events, global_events.geds.t0_start),
+        ft_spm = _build_lar_cut(data, sel, global_events, fill(get_spms_evt_lar_cut_props(data, sel).ft_cut_t0, length(global_events.geds.t0_start))),
         ged_pmt = _build_muon_evt_cut(data, sel, global_events, pmt_events)
     )
 
