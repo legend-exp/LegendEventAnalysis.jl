@@ -94,9 +94,7 @@ function _build_muon_evt_cut(data::LegendData, sel::AnyValiditySelection, global
     output_colnames = (:timestamp, :pe_cal, :multiplicity)
     cutout_colnames = (:is_valid_muon, :n_hit_window)
     colnames_types = Tuple{Bool, Int, typeof(0.0u"s"), typeof(0.0u"e_au"), Int}
-    if isempty(pmt_events)
-        return StructArray(fill(NamedTuple{(cutout_colnames..., output_colnames...), colnames_types}([true, 0, NaN*u"s", 0.0u"e_au", 0]), length(global_events)))
-    elseif count(.!pmt_events.is_valid_muon) == 0
+    if isempty(pmt_events) || count(.!pmt_events.is_valid_muon) == 0
         return StructArray(fill(NamedTuple{(cutout_colnames..., output_colnames...), colnames_types}([true, 0, NaN*u"s", 0.0u"e_au", 0]), length(global_events)))
     end
     geds_t0_absolute = global_events.tstart .+ global_events.geds.t0_start
@@ -111,6 +109,7 @@ function _build_muon_evt_cut(data::LegendData, sel::AnyValiditySelection, global
     pmt_events_trig = evtdata_output_pf.(pmt_events[findall(.!pmt_events.is_valid_muon)])
 
     @assert length(propertynames(pmt_events_trig)) == length(output_colnames) && all(hasproperty.(Ref(pmt_events_trig), output_colnames)) "Invalid `evtdata_output` properties"
+    pmt_events_trig = StructArray(NamedTuple{output_colnames}(columns(pmt_events_trig)))
 
     empty_evt::typeof(first(pmt_events_trig)) = typeof(first(pmt_events_trig))([zero(first(pmt_events_trig)[k]) for k in keys(first(pmt_events_trig))])
 
