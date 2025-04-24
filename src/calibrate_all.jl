@@ -7,7 +7,7 @@
 Calibrate all channels in the given datastore, using the metadata
 processing configuration for `data` and `sel`.
 """
-function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDict, tier::DataTierLike=:jldsp)
+function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDataStore, tier::DataTierLike=:jldsp)
     ds = datastore
 
     @debug "Calibrating all channels in for `ValiditySelection` $(sel) in `DataTier` $(tier)"

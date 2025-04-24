@@ -20,6 +20,8 @@ using Unitful: RealOrRealQuantity as RealQuantity
 using LegendDataTypes: fast_flatten
 
 
+const AbstractDataStore = Union{AbstractDict, NamedTuple}
+
 include("flatten_over_channels.jl")
 include("build_global_events.jl")
 include("calibrate_geds.jl")
