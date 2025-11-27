@@ -2,6 +2,42 @@
 
 
 """
+    _get_channel_data(ds::AbstractDataStore, data::LegendData, sel::AnyValiditySelection, channel::ChannelId, tier::DataTierLike)
+
+Helper function for flexible key resolution when accessing channel data from datastore.
+Prefers detector name key (e.g., "V00048A"), falls back to channel ID key (e.g., "ch1084000").
+This ensures compatibility with both old (channel ID) and new (detector name) file formats.
+"""
+function _get_channel_data(ds::AbstractDataStore, data::LegendData, sel::AnyValiditySelection, channel::ChannelId, tier::DataTierLike)
+    detector = channelinfo(data, sel, channel).detector
+    detector_key = string(detector)
+    channel_key = string(channel)
+    
+    # Try detector name first (new format)
+    if haskey(ds, detector_key)
+        return detector, ds[detector, tier][:]
+    # Fallback to channel ID (old format)
+    elseif haskey(ds, channel_key)
+        return detector, ds[channel, tier][:]
+    else
+        throw(KeyError("Neither detector key '$detector_key' nor channel key '$channel_key' found in datastore"))
+    end
+end
+
+"""
+    _has_channel_data(ds::AbstractDataStore, data::LegendData, sel::AnyValiditySelection, channel::ChannelId)
+
+Check if channel data exists in datastore under either detector name or channel ID key.
+"""
+function _has_channel_data(ds::AbstractDataStore, data::LegendData, sel::AnyValiditySelection, channel::ChannelId)
+    detector = channelinfo(data, sel, channel).detector
+    detector_key = string(detector)
+    channel_key = string(channel)
+    return haskey(ds, detector_key) || haskey(ds, channel_key)
+end
+
+
+"""
     calibrate_all(data::LegendData, sel::ValiditySelection, datastore::AbstractDict)
 
 Calibrate all channels in the given datastore, using the metadata
@@ -29,7 +65,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     ged_caldata_v = Vector{StructVector}(undef, length(geds_channels))
     p = Progress(length(geds_channels); desc="Calibrating HPGe channels...")
     Threads.@threads for i in eachindex(geds_channels)
-        let detector = channelinfo(data, sel, geds_channels[i]).detector, chdata = ds[geds_channels[i], tier][:]
+        let (detector, chdata) = _get_channel_data(ds, data, sel, geds_channels[i], tier)
             ged_caldata_v[i] = calibrate_ged_channel_data(data, sel, detector, chdata; ged_kwargs...)
             next!(p; showvalues = [("Calibrated detector", detector)])
         end
@@ -99,9 +135,9 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     @debug "Calibrating SiPM channels"
     spm_kwargs = get_spms_evt_kwargs(data, sel)
     spm_caldata_v = Vector{StructVector}(undef, length(spms_channels))
-    p = Progress(length(geds_channels); desc="Calibrating SiPM channels...")
+    p = Progress(length(spms_channels); desc="Calibrating SiPM channels...")
     Threads.@threads for i in eachindex(spms_channels)
-        let detector = channelinfo(data, sel, spms_channels[i]).detector, chdata = ds[spms_channels[i], tier][:]
+        let (detector, chdata) = _get_channel_data(ds, data, sel, spms_channels[i], tier)
             spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata; spm_kwargs...)
             next!(p; showvalues = [("Calibrated detector", detector)])
         end
@@ -112,7 +148,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
 
     # PMT:
-    pmt_events = if all(.!haskey.(Ref(ds), string.(pmts_channels)))
+    pmt_events = if all(.!_has_channel_data.(Ref(ds), Ref(data), Ref(sel), pmts_channels))
         @warn "No PMT data found, skip PMT calibration"
         Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
     else
@@ -121,7 +157,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         pmt_caldata_v = Vector{StructVector}(undef, length(pmts_channels))
         p = Progress(length(pmts_channels); desc="Calibrating PMT channels...")
         Threads.@threads for i in eachindex(pmts_channels)
-            let detector = channelinfo(data, sel, pmts_channels[i]).detector, chdata = ds[pmts_channels[i], tier][:]
+            let (detector, chdata) = _get_channel_data(ds, data, sel, pmts_channels[i], tier)
                 pmt_caldata_v[i] = calibrate_pmt_channel_data(data, sel, detector, chdata; pmt_kwargs...)
                 next!(p; showvalues = [("Calibrated detector", detector)])
             end
@@ -139,8 +175,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     # aux & Forced Trigger
     aux_caldata = 
         [Dict(
-            let detector = channelinfo(data, sel, channel).detector,
-                chdata = ds[channel, tier][:]
+            let (detector, chdata) = _get_channel_data(ds, data, sel, channel, tier)
                 channel => calibrate_aux_channel_data(data, sel, detector, chdata)
             end
             ) for channel in aux_channels]
