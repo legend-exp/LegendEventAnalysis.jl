@@ -102,8 +102,12 @@ function _build_muon_evt_cut(data::LegendData, sel::AnyValiditySelection, global
     dataprod_muoncut = get_pmts_evt_muon_cut_props(data, sel)
     
     ged_sum_window = dataprod_muoncut.ged_sum_window
+    
+    # Apply optional tstart offset (for timing correction between HPGe and PMT systems)
+    pmt_tstart_offset = get(dataprod_muoncut, :pmt_tstart_offset, 0.0u"µs")
+    geds_t0_corrected = geds_t0_absolute .+ pmt_tstart_offset
 
-    t_wins = ClosedInterval.(geds_t0_absolute .+ first(ged_sum_window), geds_t0_absolute .+ last(ged_sum_window))
+    t_wins = ClosedInterval.(geds_t0_corrected .+ first(ged_sum_window), geds_t0_corrected .+ last(ged_sum_window))
 
     evtdata_output_pf = get_pmts_evt_evtdata_propfunc(data, sel)
     pmt_events_trig = evtdata_output_pf.(pmt_events[findall(.!pmt_events.is_valid_muon)])

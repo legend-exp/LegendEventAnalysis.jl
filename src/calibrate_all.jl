@@ -2,6 +2,42 @@
 
 
 """
+    _get_channel_data(ds::AbstractDataStore, data::LegendData, sel::AnyValiditySelection, channel::ChannelId, tier::DataTierLike)
+
+Helper function for flexible key resolution when accessing channel data from datastore.
+Prefers detector name key (e.g., "V00048A"), falls back to channel ID key (e.g., "ch1084000").
+This ensures compatibility with both old (channel ID) and new (detector name) file formats.
+"""
+function _get_channel_data(ds::AbstractDataStore, data::LegendData, sel::AnyValiditySelection, channel::ChannelId, tier::DataTierLike)
+    detector = channelinfo(data, sel, channel).detector
+    detector_key = string(detector)
+    channel_key = string(channel)
+    
+    # Try detector name first (new format)
+    if haskey(ds, detector_key)
+        return detector, ds[detector, tier][:]
+    # Fallback to channel ID (old format)
+    elseif haskey(ds, channel_key)
+        return detector, ds[channel, tier][:]
+    else
+        throw(KeyError("Neither detector key '$detector_key' nor channel key '$channel_key' found in datastore"))
+    end
+end
+
+"""
+    _has_channel_data(ds::AbstractDataStore, data::LegendData, sel::AnyValiditySelection, channel::ChannelId)
+
+Check if channel data exists in datastore under either detector name or channel ID key.
+"""
+function _has_channel_data(ds::AbstractDataStore, data::LegendData, sel::AnyValiditySelection, channel::ChannelId)
+    detector = channelinfo(data, sel, channel).detector
+    detector_key = string(detector)
+    channel_key = string(channel)
+    return haskey(ds, detector_key) || haskey(ds, channel_key)
+end
+
+
+"""
     calibrate_all(data::LegendData, sel::ValiditySelection, datastore::AbstractDict)
 
 Calibrate all channels in the given datastore, using the metadata
@@ -29,7 +65,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     ged_caldata_v = Vector{StructVector}(undef, length(geds_channels))
     p = Progress(length(geds_channels); desc="Calibrating HPGe channels...")
     Threads.@threads for i in eachindex(geds_channels)
-        let detector = channelinfo(data, sel, geds_channels[i]).detector, chdata = ds[geds_channels[i], tier][:]
+        let (detector, chdata) = _get_channel_data(ds, data, sel, geds_channels[i], tier)
             ged_caldata_v[i] = calibrate_ged_channel_data(data, sel, detector, chdata; ged_kwargs...)
             next!(p; showvalues = [("Calibrated detector", detector)])
         end
@@ -39,7 +75,25 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     @debug "Building global events for HPGe channels"
     ged_events_pre = build_global_events(ged_caldata, geds_channels)
 
-    min_t0(t0::AbstractVector{<:Number}) = isempty(t0) ? eltype(t0)(NaN) : minimum(t0)
+    # Get optional t0 valid window from PMT muon_cut config (filters out bad t0 values from AC-coupled detectors)
+    dataprod_muoncut = get_pmts_evt_muon_cut_props(data, sel)
+    ged_t0_valid_window = get(dataprod_muoncut, :ged_t0_valid_window, nothing)
+    # Note: ged_t0_valid_window is a tuple of Quantity values like (40.0µs, 60.0µs)
+    # t0 values from DSP also have units (µs), so comparison works directly
+    
+    # Filter out NaN values and optionally values outside valid window when computing minimum t0
+    function min_t0_filtered(t0::AbstractVector, ged_t0_window)
+        # Filter NaN values (works with both unitful and unitless)
+        valid_t0 = filter(x -> !isnan(ustrip(x)), t0)
+        if !isnothing(ged_t0_window)
+            t0_min, t0_max = first(ged_t0_window), last(ged_t0_window)
+            # Strip units for comparison to handle both unitful and unitless t0 values
+            t0_min_val = ustrip(u"µs", t0_min)
+            t0_max_val = ustrip(u"µs", t0_max)
+            valid_t0 = filter(t -> ustrip(u"µs", t) >= t0_min_val && ustrip(u"µs", t) <= t0_max_val, valid_t0)
+        end
+        return isempty(valid_t0) ? eltype(t0)(NaN) : minimum(valid_t0)
+    end
 
     max_e_ch = broadcast(ged_events_pre.e_cusp_ctc_cal) do e_cal
         findmax(x -> isnan(x) ? zero(x) : x, e_cal)[2]
@@ -53,6 +107,15 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     trig_e_cusp_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_ctc_cal, trig_e_ch))
     trig_e_535_cal      = _fix_vov(getindex.(ged_events_pre.e_535_cal, trig_e_ch))
     trig_t0 = _fix_vov(getindex.(ged_events_pre.t0, trig_e_ch))
+
+    # Check if any events have only NaN t0 values (detectors without calibration)
+    # Note: Use ustrip for Unitful compatibility
+    n_events_all_nan_t0 = count(t0 -> all(x -> isnan(ustrip(x)), t0), trig_t0)
+    if n_events_all_nan_t0 > 0
+        @warn "$(n_events_all_nan_t0) events have all NaN t0 values (all trigger detectors missing calibration). " *
+              "t0_start will be NaN for these events, affecting muon veto coincidence matching."
+    end
+
     n_trig = length.(trig_e_ch)
     n_expected_baseline = length.(ged_events_pre.is_baseline) .- length.(trig_e_ch)
     
@@ -67,7 +130,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     end
 
     ged_additional_cols = (
-        t0_start = min_t0.(trig_t0),
+        t0_start = min_t0_filtered.(trig_t0, Ref(ged_t0_valid_window)),
         trig_t0 = trig_t0,
         multiplicity = n_trig,
         max_e_ch_idxs = max_e_ch,
@@ -99,9 +162,9 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     @debug "Calibrating SiPM channels"
     spm_kwargs = get_spms_evt_kwargs(data, sel)
     spm_caldata_v = Vector{StructVector}(undef, length(spms_channels))
-    p = Progress(length(geds_channels); desc="Calibrating SiPM channels...")
+    p = Progress(length(spms_channels); desc="Calibrating SiPM channels...")
     Threads.@threads for i in eachindex(spms_channels)
-        let detector = channelinfo(data, sel, spms_channels[i]).detector, chdata = ds[spms_channels[i], tier][:]
+        let (detector, chdata) = _get_channel_data(ds, data, sel, spms_channels[i], tier)
             spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata; spm_kwargs...)
             next!(p; showvalues = [("Calibrated detector", detector)])
         end
@@ -112,7 +175,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
 
     # PMT:
-    pmt_events = if all(.!haskey.(Ref(ds), string.(pmts_channels)))
+    pmt_caldata = nothing  # Will be set if PMT data exists
+    pmt_events = if all(.!_has_channel_data.(Ref(ds), Ref(data), Ref(sel), pmts_channels))
         @warn "No PMT data found, skip PMT calibration"
         Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
     else
@@ -121,7 +185,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         pmt_caldata_v = Vector{StructVector}(undef, length(pmts_channels))
         p = Progress(length(pmts_channels); desc="Calibrating PMT channels...")
         Threads.@threads for i in eachindex(pmts_channels)
-            let detector = channelinfo(data, sel, pmts_channels[i]).detector, chdata = ds[pmts_channels[i], tier][:]
+            let (detector, chdata) = _get_channel_data(ds, data, sel, pmts_channels[i], tier)
                 pmt_caldata_v[i] = calibrate_pmt_channel_data(data, sel, detector, chdata; pmt_kwargs...)
                 next!(p; showvalues = [("Calibrated detector", detector)])
             end
@@ -139,8 +203,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     # aux & Forced Trigger
     aux_caldata = 
         [Dict(
-            let detector = channelinfo(data, sel, channel).detector,
-                chdata = ds[channel, tier][:]
+            let (detector, chdata) = _get_channel_data(ds, data, sel, channel, tier)
                 channel => calibrate_aux_channel_data(data, sel, detector, chdata)
             end
             ) for channel in aux_channels]
@@ -166,8 +229,12 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     result = StructArray(merge(columns(global_events), cross_systems_cols))
     
+    # Check calibration quality and identify detectors with missing parameters
+    calibration_issues = _check_calibration_quality(data, sel, ged_caldata, spm_caldata, pmt_caldata, 
+                                                     geds_channels, spms_channels, pmts_channels)
+    
     result_t = Table(NamedTuple{propertynames(result)}([if c isa StructArray Table(c) else c end for c in columns(result)]))
-    return result_t, Table(pmt_events)
+    return result_t, Table(pmt_events), calibration_issues
 end
 export calibrate_all
 
@@ -176,3 +243,102 @@ _fix_vov(x) = x
 _fix_vov(x::AbstractVector{<:AbstractVector}) = VectorOfVectors(x)
 _fix_vov(x::VectorOfVectors{<:AbstractVector}) = VectorOfVectors(VectorOfVectors(flatview(x)), x.elem_ptr)
 _fix_vov(t::Table) = Table(NamedTuple{propertynames(t)}([if c isa Table Table(StructArray(map(_fix_vov, columns(c)))) else c end for c in columns(t)]))
+
+
+"""
+    _check_calibration_quality(data, sel, ged_caldata, spm_caldata, pmt_caldata, geds_channels, spms_channels, pmts_channels)
+
+Identify detectors with missing calibration parameters (NaN fallback values).
+Returns a NamedTuple with lists of affected detector names per subsystem.
+"""
+function _check_calibration_quality(data::LegendData, sel::AnyValiditySelection,
+                                     ged_caldata::Dict, spm_caldata::Dict, pmt_caldata::Union{Dict, Nothing},
+                                     geds_channels::Vector{ChannelId}, 
+                                     spms_channels::Vector{ChannelId}, 
+                                     pmts_channels::Vector{ChannelId})
+    
+    missing_ecal = String[]
+    missing_sipmcal = String[]
+    missing_pmtcal = String[]
+    
+    # === HPGe: Check for NaN energy calibration per detector ===
+    for ch in geds_channels
+        try
+            chinfo = channelinfo(data, sel, ch)
+            detector = chinfo.detector
+            usability = chinfo.usability
+            caldata = ged_caldata[ch]
+            # Check if e_cusp_ctc_cal has any valid (non-NaN) values
+            if hasproperty(caldata, :e_cusp_ctc_cal)
+                e_vals = caldata.e_cusp_ctc_cal
+                if !isempty(e_vals) && all(isnan, e_vals)
+                    # Include usability status in detector name
+                    push!(missing_ecal, "$(detector) ($(usability))")
+                end
+            end
+        catch; end
+    end
+    
+    # === SiPM: Check for NaN energy calibration per detector ===
+    for ch in spms_channels
+        try
+            detector = channelinfo(data, sel, ch).detector
+            caldata = spm_caldata[ch]
+            # Check if trig_max_cal (main SiPM energy) has NaN values
+            has_nan = false
+            if hasproperty(caldata, :trig_max_cal)
+                e_vals = caldata.trig_max_cal
+                # trig_max_cal is VectorOfArrays, need to flatten
+                flat_vals = reduce(vcat, e_vals; init=Float64[])
+                if !isempty(flat_vals) && all(isnan, flat_vals)
+                    has_nan = true
+                end
+            end
+            if has_nan
+                push!(missing_sipmcal, string(detector))
+            end
+        catch; end
+    end
+    
+    # === PMT: Check for NaN energy calibration per detector ===
+    if pmt_caldata !== nothing
+        for ch in pmts_channels
+            try
+                detector = channelinfo(data, sel, ch).detector
+                caldata = pmt_caldata[ch]
+                # Check if e_fc has NaN values  
+                if hasproperty(caldata, :e_fc)
+                    e_vals = caldata.e_fc
+                    if !isempty(e_vals) && all(isnan, e_vals)
+                        push!(missing_pmtcal, string(detector))
+                    end
+                end
+            catch; end
+        end
+    else
+        # All PMTs missing if no pmt_caldata
+        for ch in pmts_channels
+            try
+                detector = channelinfo(data, sel, ch).detector
+                push!(missing_pmtcal, string(detector))
+            catch; end
+        end
+    end
+    
+    # Log warnings if any detectors have missing calibrations
+    if !isempty(missing_ecal)
+        @warn "HPGe detectors with missing ecal (NaN energy): $(join(missing_ecal, ", "))"
+    end
+    if !isempty(missing_sipmcal)
+        @warn "SiPM detectors with missing sipmcal: $(join(missing_sipmcal, ", "))"
+    end
+    if !isempty(missing_pmtcal)
+        @warn "PMT detectors with missing pmtcal: $(join(missing_pmtcal, ", "))"
+    end
+    
+    return (
+        missing_ecal = missing_ecal,
+        missing_sipmcal = missing_sipmcal,
+        missing_pmtcal = missing_pmtcal
+    )
+end
