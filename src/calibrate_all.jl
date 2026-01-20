@@ -10,84 +10,84 @@ processing configuration for `data` and `sel`.
 function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDataStore, tier::DataTierLike=:jldsp)
     ds = datastore
 
-    @debug "Calibrating all channels in for `ValiditySelection` $(sel) in `DataTier` $(tier)"
+    @debug "Calibrating all detectors for `ValiditySelection` $(sel) in `DataTier` $(tier)"
     chinfo = channelinfo(data, sel)
-    geds_channels::Vector{ChannelId} = filterby(get_ged_evt_chsel_propfunc(data, sel))(chinfo).channel
-    @debug "Loaded $(length(geds_channels)) HPGe channels"
-    hitgeds_channels::Vector{ChannelId} = filterby(get_ged_evt_hitchsel_propfunc(data, sel))(chinfo).channel
-    @debug "Loaded $(length(hitgeds_channels)) HPGe hit channels"
-    spms_channels::Vector{ChannelId} = filterby(get_spms_evt_chsel_propfunc(data, sel))(chinfo).channel
-    @debug "Loaded $(length(spms_channels)) SiPM channels"
-    pmts_channels::Vector{ChannelId} = filterby(get_pmts_evt_chsel_propfunc(data, sel))(chinfo).channel
-    @debug "Loaded $(length(pmts_channels)) PMT channels"
-    aux_channels::Vector{ChannelId} = filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).channel
-    @debug "Loaded auxiliary channels: $(join(string.(filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).detector), ", "))"
+    geds_detectors::Vector{DetectorId} = filterby(get_ged_evt_chsel_propfunc(data, sel))(chinfo).detector
+    @debug "Loaded $(length(geds_detectors)) HPGe detectors"
+    hitgeds_detectors::Vector{DetectorId} = filterby(get_ged_evt_hitchsel_propfunc(data, sel))(chinfo).detector
+    @debug "Loaded $(length(hitgeds_detectors)) HPGe hit detectors"
+    spms_detectors::Vector{DetectorId} = filterby(get_spms_evt_chsel_propfunc(data, sel))(chinfo).detector
+    @debug "Loaded $(length(spms_detectors)) SiPM detectors"
+    pmts_detectors::Vector{DetectorId} = filterby(get_pmts_evt_chsel_propfunc(data, sel))(chinfo).detector
+    @debug "Loaded $(length(pmts_detectors)) PMT detectors"
+    aux_detectors::Vector{DetectorId} = filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).detector
+    @debug "Loaded auxiliary detectors: $(join(string.(aux_detectors), ", "))"
 
     # HPGe:
-    @debug "Calibrating HPGe channels"
+    @debug "Calibrating HPGe detectors"
     ged_kwargs = get_ged_evt_kwargs(data, sel)
-    ged_caldata_v = Vector{StructVector}(undef, length(geds_channels))
-    p = Progress(length(geds_channels); desc="Calibrating HPGe channels...")
-    Threads.@threads for i in eachindex(geds_channels)
-        let detector = channelinfo(data, sel, geds_channels[i]).detector, chdata = ds[geds_channels[i], tier][:]
+    ged_caldata_v = Vector{StructVector}(undef, length(geds_detectors))
+    p = Progress(length(geds_detectors); desc="Calibrating HPGe detectors...")
+    Threads.@threads for i in eachindex(geds_detectors)
+        let detector = geds_detectors[i], chdata = ds[string(detector), tier][:]
             ged_caldata_v[i] = calibrate_ged_channel_data(data, sel, detector, chdata; ged_kwargs...)
             next!(p; showvalues = [("Calibrated detector", detector)])
         end
     end
-    ged_caldata = Dict(geds_channels .=> ged_caldata_v)
+    ged_caldata = Dict(geds_detectors .=> ged_caldata_v)
 
-    @debug "Building global events for HPGe channels"
-    ged_events_pre = build_global_events(ged_caldata, geds_channels)
+    @debug "Building global events for HPGe detectors"
+    ged_events_pre = build_global_events(ged_caldata, geds_detectors)
 
     min_t0(t0::AbstractVector{<:Number}) = isempty(t0) ? eltype(t0)(NaN) : minimum(t0)
 
-    max_e_ch = broadcast(ged_events_pre.e_cusp_ctc_cal) do e_cal
+    max_e_det = broadcast(ged_events_pre.e_cusp_ctc_cal) do e_cal
         findmax(x -> isnan(x) ? zero(x) : x, e_cal)[2]
     end
 
-    trig_e_ch = findall.(ged_events_pre.is_physical_trig)
+    trig_e_det = findall.(ged_events_pre.is_physical_trig)
 
-    trig_e_trap_max_cal = _fix_vov(getindex.(ged_events_pre.e_trap_max_cal, trig_e_ch))
-    trig_e_cusp_max_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_max_cal, trig_e_ch))
-    trig_e_trap_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_trap_ctc_cal, trig_e_ch))
-    trig_e_cusp_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_ctc_cal, trig_e_ch))
-    trig_e_535_cal      = _fix_vov(getindex.(ged_events_pre.e_535_cal, trig_e_ch))
-    trig_t0 = _fix_vov(getindex.(ged_events_pre.t0, trig_e_ch))
-    n_trig = length.(trig_e_ch)
-    n_expected_baseline = length.(ged_events_pre.is_baseline) .- length.(trig_e_ch)
+    trig_e_trap_max_cal = _fix_vov(getindex.(ged_events_pre.e_trap_max_cal, trig_e_det))
+    trig_e_cusp_max_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_max_cal, trig_e_det))
+    trig_e_trap_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_trap_ctc_cal, trig_e_det))
+    trig_e_cusp_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_ctc_cal, trig_e_det))
+    trig_e_535_cal      = _fix_vov(getindex.(ged_events_pre.e_535_cal, trig_e_det))
+    trig_t0 = _fix_vov(getindex.(ged_events_pre.t0, trig_e_det))
+    n_trig = length.(trig_e_det)
+    n_expected_baseline = length.(ged_events_pre.is_baseline) .- length.(trig_e_det)
     
     maximum_with_init(A) = maximum(A, init=zero(eltype((A))))
 
-    is_valid_trig(trig_chs::AbstractVector{<:Int}, hit_channels::AbstractVector{<:Int}) = all(x -> x in hit_channels, trig_chs)
+    is_valid_trig(trig_dets::AbstractVector{<:DetectorId}, hit_detectors::AbstractVector{<:DetectorId}) = all(x -> x in hit_detectors, trig_dets)
     
     hit_properties = get_ged_evt_is_valid_hit_properties(data, sel)
-    is_valid_hit = trues(length(ged_events_pre.channel))
+    is_valid_hit = trues(length(ged_events_pre.detector))
     for prop in hit_properties
-        is_valid_hit .&= all.(map.(isfinite, (getindex.(getproperty(ged_events_pre, prop), trig_e_ch))))
+        is_valid_hit .&= all.(map.(isfinite, (getindex.(getproperty(ged_events_pre, prop), trig_e_det))))
     end
 
     ged_additional_cols = (
         t0_start = min_t0.(trig_t0),
         trig_t0 = trig_t0,
         multiplicity = n_trig,
-        max_e_ch_idxs = max_e_ch,
-        max_e_ch = only.(getindex.(ged_events_pre.channel, max_e_ch)),
+        max_e_det_idxs = max_e_det,
+        max_e_det = getindex.(ged_events_pre.detector, max_e_det),
         max_e_trap_cal = maximum_with_init.(trig_e_trap_max_cal),
         max_e_cusp_cal = maximum_with_init.(trig_e_cusp_max_cal),
         max_e_trap_ctc_cal = maximum_with_init.(trig_e_trap_ctc_cal),
         max_e_cusp_ctc_cal = maximum_with_init.(trig_e_cusp_ctc_cal),
         max_e_short_cal = maximum_with_init.(trig_e_535_cal),
-        trig_e_ch_idxs = trig_e_ch,
-        trig_e_ch = getindex.(ged_events_pre.channel, trig_e_ch),
+        trig_e_det_idxs = trig_e_det,
+        trig_e_det = getindex.(ged_events_pre.detector, trig_e_det),
         trig_e_trap_max_cal = trig_e_trap_max_cal,
         trig_e_cusp_max_cal = trig_e_cusp_max_cal,
         trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
         trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
         trig_e_535_cal = trig_e_535_cal,
         is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline,
-        is_valid_trig = is_valid_trig.(getindex.(ged_events_pre.channel, trig_e_ch), Ref(Int.(hitgeds_channels))),
+        is_valid_trig = is_valid_trig.(getindex.(ged_events_pre.detector, trig_e_det), Ref(hitgeds_detectors)),
         is_valid_hit = is_valid_hit,
-        is_valid_psd = all.(getindex.(ged_events_pre.psd_classifier, trig_e_ch)),
+        is_valid_psd = all.(getindex.(ged_events_pre.psd_classifier, trig_e_det)),
         is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
         is_saturated = any.(ged_events_pre.is_saturated),
         is_discharge = any.(ged_events_pre.is_discharge),
@@ -96,55 +96,55 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
 
     # SiPM:
-    @debug "Calibrating SiPM channels"
+    @debug "Calibrating SiPM detectors"
     spm_kwargs = get_spms_evt_kwargs(data, sel)
-    spm_caldata_v = Vector{StructVector}(undef, length(spms_channels))
-    p = Progress(length(geds_channels); desc="Calibrating SiPM channels...")
-    Threads.@threads for i in eachindex(spms_channels)
-        let detector = channelinfo(data, sel, spms_channels[i]).detector, chdata = ds[spms_channels[i], tier][:]
+    spm_caldata_v = Vector{StructVector}(undef, length(spms_detectors))
+    p = Progress(length(spms_detectors); desc="Calibrating SiPM detectors...")
+    Threads.@threads for i in eachindex(spms_detectors)
+        let detector = spms_detectors[i], chdata = ds[string(detector), tier][:]
             spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata; spm_kwargs...)
             next!(p; showvalues = [("Calibrated detector", detector)])
         end
     end
-    spm_caldata = Dict(spms_channels .=> spm_caldata_v)
-    @debug "Building global events for SiPM channels"
-    spm_events_novov = build_global_events(spm_caldata, spms_channels)
+    spm_caldata = Dict(spms_detectors .=> spm_caldata_v)
+    @debug "Building global events for SiPM detectors"
+    spm_events_novov = build_global_events(spm_caldata, spms_detectors)
     spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
 
     # PMT:
-    pmt_events = if all(.!haskey.(Ref(ds), string.(pmts_channels)))
+    pmt_events = if all(.!haskey.(Ref(ds), string.(pmts_detectors)))
         @warn "No PMT data found, skip PMT calibration"
         Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
     else
-        @debug "Calibrating PMT channels"
+        @debug "Calibrating PMT detectors"
         pmt_kwargs = get_pmts_evt_kwargs(data, sel)
-        pmt_caldata_v = Vector{StructVector}(undef, length(pmts_channels))
-        p = Progress(length(pmts_channels); desc="Calibrating PMT channels...")
-        Threads.@threads for i in eachindex(pmts_channels)
-            let detector = channelinfo(data, sel, pmts_channels[i]).detector, chdata = ds[pmts_channels[i], tier][:]
+        pmt_caldata_v = Vector{StructVector}(undef, length(pmts_detectors))
+        p = Progress(length(pmts_detectors); desc="Calibrating PMT detectors...")
+        Threads.@threads for i in eachindex(pmts_detectors)
+            let detector = pmts_detectors[i], chdata = ds[string(detector), tier][:]
                 pmt_caldata_v[i] = calibrate_pmt_channel_data(data, sel, detector, chdata; pmt_kwargs...)
                 next!(p; showvalues = [("Calibrated detector", detector)])
             end
         end
-        pmt_caldata = Dict(pmts_channels .=> pmt_caldata_v)
-        @debug "Building global events for PMT channels"
-        pmt_events_pre_novov = build_global_events(pmt_caldata, pmts_channels)
+        pmt_caldata = Dict(pmts_detectors .=> pmt_caldata_v)
+        @debug "Building global events for PMT detectors"
+        pmt_events_pre_novov = build_global_events(pmt_caldata, pmts_detectors)
         pmt_events_pre = StructArray(map(_fix_vov, columns(pmt_events_pre_novov)))
 
         StructVector(merge(columns(_build_muon_cut(data, sel, pmt_events_pre)), columns(pmt_events_pre)))
     end
 
 
-    @debug "Calibrating auxiliary channels"
+    @debug "Calibrating auxiliary detectors"
     # aux & Forced Trigger
     aux_caldata = 
         [Dict(
-            let detector = channelinfo(data, sel, channel).detector,
-                chdata = ds[channel, tier][:]
-                channel => calibrate_aux_channel_data(data, sel, detector, chdata)
+            let detector = aux_detectors[i],
+                chdata = ds[string(detector), tier][:]
+                detector => calibrate_aux_channel_data(data, sel, detector, chdata)
             end
-            ) for channel in aux_channels]
-    @debug "Building global events for auxiliary channels"
+            ) for i in eachindex(aux_detectors)]
+    @debug "Building global events for auxiliary detectors"
     aux_events = NamedTuple{Tuple(get_aux_evt_levelname_propfunc.(Ref(data), Ref(sel), reduce(vcat, collect.(keys.(aux_caldata)))))}(build_global_events.(aux_caldata))
 
     # Cross-system:
