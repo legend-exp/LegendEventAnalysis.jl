@@ -1,39 +1,39 @@
 # This file is a part of LegendEventAnalysis.jl, licensed under the MIT License (MIT).
 
 """
-    calibrate_pmt_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+    calibrate_pmt_detector_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, detector_data::AbstractVector)
 
 Apply the calibration specified by `data` and `sel` for the given PMT
-`detector` to the single-channel `channel_data` for that detector.
+`detector` to the single-detector `detector_data` for that detector.
 
 Also calculates the configured cut/flag values.
 """
-function calibrate_pmt_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector; 
+function calibrate_pmt_detector_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, detector_data::AbstractVector; 
     e_cal_pars_type::Symbol=:rpars, e_cal_pars_cat::Symbol=:pmtcal, 
-    keep_chdata::Bool=false)
-    chdata = channel_data[:]
+    keep_detdata::Bool=false)
+    detdata = detector_data[:]
 
     pmtcal_pf = get_pmt_cal_propfunc(data, sel, detector; pars_type=e_cal_pars_type, pars_cat=e_cal_pars_cat)
     cut_is_physical_trig = get_pmt_is_physical_trig_propfunc(data, sel, detector; pars_type=e_cal_pars_type)
 
     # get additional cols to be parsed into the event tier
-    chdata_output_pf = if keep_chdata
-        PropSelFunction{propertynames(chdata)}()
+    detdata_output_pf = if keep_detdata
+        PropSelFunction{propertynames(detdata)}()
     else
-        get_pmts_evt_chdata_propfunc(data, sel)
+        get_pmts_evt_detdata_propfunc(data, sel)
     end
 
-    cal_output = pmtcal_pf.(chdata)
+    cal_output = pmtcal_pf.(detdata)
 
-    cal_chdata = StructArray(merge(columns(cal_output), columns(chdata)))
+    cal_detdata = StructArray(merge(columns(cal_output), columns(detdata)))
 
-    chdata_output = chdata_output_pf.(chdata)
+    detdata_output = detdata_output_pf.(detdata)
 
-    is_physical_trig = cut_is_physical_trig.(cal_chdata)
+    is_physical_trig = cut_is_physical_trig.(cal_detdata)
     
-    return StructVector(merge(columns(cal_output), columns(chdata_output), columns(is_physical_trig)))
+    return StructVector(merge(columns(cal_output), columns(detdata_output), columns(is_physical_trig)))
 end
-export calibrate_pmt_channel_data
+export calibrate_pmt_detector_data
 
 function _muon_cut(
     colnames::Tuple{Symbol, Symbol, Symbol},

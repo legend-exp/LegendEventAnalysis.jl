@@ -4,7 +4,7 @@
 """
     calibrate_all(data::LegendData, sel::ValiditySelection, datastore::AbstractDict)
 
-Calibrate all channels in the given datastore, using the metadata
+Calibrate all detectors in the given datastore, using the metadata
 processing configuration for `data` and `sel`.
 """
 function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDataStore, tier::DataTierLike=:jldsp)
@@ -12,15 +12,15 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     @debug "Calibrating all detectors for `ValiditySelection` $(sel) in `DataTier` $(tier)"
     chinfo = channelinfo(data, sel)
-    geds_detectors::Vector{DetectorId} = filterby(get_ged_evt_chsel_propfunc(data, sel))(chinfo).detector
+    geds_detectors::Vector{DetectorId} = filterby(get_ged_evt_detsel_propfunc(data, sel))(chinfo).detector
     @debug "Loaded $(length(geds_detectors)) HPGe detectors"
-    hitgeds_detectors::Vector{DetectorId} = filterby(get_ged_evt_hitchsel_propfunc(data, sel))(chinfo).detector
+    hitgeds_detectors::Vector{DetectorId} = filterby(get_ged_evt_hitdetsel_propfunc(data, sel))(chinfo).detector
     @debug "Loaded $(length(hitgeds_detectors)) HPGe hit detectors"
-    spms_detectors::Vector{DetectorId} = filterby(get_spms_evt_chsel_propfunc(data, sel))(chinfo).detector
+    spms_detectors::Vector{DetectorId} = filterby(get_spms_evt_detsel_propfunc(data, sel))(chinfo).detector
     @debug "Loaded $(length(spms_detectors)) SiPM detectors"
-    pmts_detectors::Vector{DetectorId} = filterby(get_pmts_evt_chsel_propfunc(data, sel))(chinfo).detector
+    pmts_detectors::Vector{DetectorId} = filterby(get_pmts_evt_detsel_propfunc(data, sel))(chinfo).detector
     @debug "Loaded $(length(pmts_detectors)) PMT detectors"
-    aux_detectors::Vector{DetectorId} = filterby(get_aux_evt_chsel_propfunc(data, sel))(chinfo).detector
+    aux_detectors::Vector{DetectorId} = filterby(get_aux_evt_detsel_propfunc(data, sel))(chinfo).detector
     @debug "Loaded auxiliary detectors: $(join(string.(aux_detectors), ", "))"
 
     # HPGe:
@@ -29,8 +29,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     ged_caldata_v = Vector{StructVector}(undef, length(geds_detectors))
     p = Progress(length(geds_detectors); desc="Calibrating HPGe detectors...")
     Threads.@threads for i in eachindex(geds_detectors)
-        let detector = geds_detectors[i], chdata = ds[string(detector), tier][:]
-            ged_caldata_v[i] = calibrate_ged_channel_data(data, sel, detector, chdata; ged_kwargs...)
+        let detector = geds_detectors[i], detdata = ds[string(detector), tier][:]
+            ged_caldata_v[i] = calibrate_ged_detector_data(data, sel, detector, detdata; ged_kwargs...)
             next!(p; showvalues = [("Calibrated detector", detector)])
         end
     end
@@ -101,8 +101,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     spm_caldata_v = Vector{StructVector}(undef, length(spms_detectors))
     p = Progress(length(spms_detectors); desc="Calibrating SiPM detectors...")
     Threads.@threads for i in eachindex(spms_detectors)
-        let detector = spms_detectors[i], chdata = ds[string(detector), tier][:]
-            spm_caldata_v[i] = calibrate_spm_channel_data(data, sel, detector, chdata; spm_kwargs...)
+        let detector = spms_detectors[i], detdata = ds[string(detector), tier][:]
+            spm_caldata_v[i] = calibrate_spm_detector_data(data, sel, detector, detdata; spm_kwargs...)
             next!(p; showvalues = [("Calibrated detector", detector)])
         end
     end
@@ -121,8 +121,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         pmt_caldata_v = Vector{StructVector}(undef, length(pmts_detectors))
         p = Progress(length(pmts_detectors); desc="Calibrating PMT detectors...")
         Threads.@threads for i in eachindex(pmts_detectors)
-            let detector = pmts_detectors[i], chdata = ds[string(detector), tier][:]
-                pmt_caldata_v[i] = calibrate_pmt_channel_data(data, sel, detector, chdata; pmt_kwargs...)
+            let detector = pmts_detectors[i], detdata = ds[string(detector), tier][:]
+                pmt_caldata_v[i] = calibrate_pmt_detector_data(data, sel, detector, detdata; pmt_kwargs...)
                 next!(p; showvalues = [("Calibrated detector", detector)])
             end
         end
@@ -140,8 +140,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     aux_caldata = 
         [Dict(
             let detector = aux_detectors[i],
-                chdata = ds[string(detector), tier][:]
-                detector => calibrate_aux_channel_data(data, sel, detector, chdata)
+                detdata = ds[string(detector), tier][:]
+                detector => calibrate_aux_detector_data(data, sel, detector, detdata)
             end
             ) for i in eachindex(aux_detectors)]
     @debug "Building global events for auxiliary detectors"

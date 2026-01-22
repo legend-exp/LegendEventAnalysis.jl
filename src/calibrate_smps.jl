@@ -1,40 +1,40 @@
 # This file is a part of LegendEventAnalysis.jl, licensed under the MIT License (MIT).
 
 """
-    calibrate_spm_channel_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, channel_data::AbstractVector)
+    calibrate_spm_detector_data(data::LegendData, sel::ValiditySelection, detector::DetectorId, detector_data::AbstractVector)
 
 Apply the calibration specified by `data` and `sel` for the given SiPM
-`detector` to the single-channel `channel_data` for that detector.
+`detector` to the single-detector `detector_data` for that detector.
 
 Also calculates the configured cut/flag values.
 """
-function calibrate_spm_channel_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, channel_data::AbstractVector;
+function calibrate_spm_detector_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, detector_data::AbstractVector;
     e_cal_pars_type::Symbol=:ppars, e_cal_pars_cat::Symbol=:sipmcal, dc_cut_pars_type::Symbol=:ppars,
-    keep_chdata::Bool=false)
-    chdata = channel_data[:]
+    keep_detdata::Bool=false)
+    detdata = detector_data[:]
 
     spmcal_pf = get_spm_cal_propfunc(data, sel, detector; pars_type=e_cal_pars_type, pars_cat=e_cal_pars_cat)
     spmdc_sel_pf = get_spm_dc_sel_propfunc(data, sel, detector; pars_type=dc_cut_pars_type)
     spmdc_cal_pf = get_spm_dc_cal_propfunc(data, sel, detector; pars_type=dc_cut_pars_type)
 
     # get additional cols to be parsed into the event tier
-    chdata_output_pf = if keep_chdata
-        PropSelFunction{propertynames(chdata)}()
+    detdata_output_pf = if keep_detdata
+        PropSelFunction{propertynames(detdata)}()
     else
-        get_spms_evt_chdata_propfunc(data, sel)
+        get_spms_evt_detdata_propfunc(data, sel)
     end
 
-    cal_output_novv = spmcal_pf.(chdata)
+    cal_output_novv = spmcal_pf.(detdata)
     cal_output = StructArray(map(VectorOfArrays, columns(cal_output_novv)))
 
-    dc_output_novv = NamedTuple{keys(spmdc_sel_pf)}([spmdc_cal_pf[e_type].(spmdc_sel_pf[e_type].(chdata)) for e_type in keys(spmdc_sel_pf)])
+    dc_output_novv = NamedTuple{keys(spmdc_sel_pf)}([spmdc_cal_pf[e_type].(spmdc_sel_pf[e_type].(detdata)) for e_type in keys(spmdc_sel_pf)])
     dc_output = StructArray(map(VectorOfArrays, columns(dc_output_novv)))
 
-    chdata_output = chdata_output_pf.(chdata)
+    detdata_output = detdata_output_pf.(detdata)
 
-    return StructVector(merge(columns(cal_output), columns(dc_output), columns(chdata_output)))
+    return StructVector(merge(columns(cal_output), columns(dc_output), columns(detdata_output)))
 end
-export calibrate_spm_channel_data
+export calibrate_spm_detector_data
 
 
 function _single_fiber_esum(
