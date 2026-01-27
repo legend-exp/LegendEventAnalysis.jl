@@ -18,7 +18,7 @@ The `tstart` column contains the start time of each event, the `detector`,
 detector-id, per-detector event numbers and per-detector
 timestamps that have been associated with each respective events.
 
-Per-detector events are accociated with the same global event if their
+Per-detector events are associated with the same global event if their
 timestamps fall within a time windows of length `ts_window`.
 """
 function build_global_event_map(data::StructVector; ts_window::Number = 25u"μs")
@@ -109,7 +109,7 @@ export apply_event_map
 
 Build global events from a dictionary of per-detector events
 
-Per-detector events are accociated with the same global event if their
+Per-detector events are associated with the same global event if their
 timestamps fall within a time windows of length `ts_window`.
 
 `data` must a dictionary of in-memory or on-disk table-like objects, keyed by
