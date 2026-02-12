@@ -155,7 +155,8 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     ), aux_events)
 
     global_events_pre = build_cross_system_events(system_events)
-    aux_cols = NamedTuple{keys(aux_events)}([StructVector(map(Broadcast.BroadcastFunction(only), columns(getproperty(global_events_pre, k)))) for k in keys(aux_events)])
+    _aux_only(c) = length(c) == 1 ? only(c) : (@warn "Duplicate aux entry, using first"; first(c))
+    aux_cols = NamedTuple{keys(aux_events)}([StructVector(map(Broadcast.BroadcastFunction(_aux_only), columns(getproperty(global_events_pre, k)))) for k in keys(aux_events)])
     global_events = StructVector(merge(Base.structdiff(columns(global_events_pre), NamedTuple{keys(aux_events)}), (aux = StructArray(aux_cols),)))
 
     cross_systems_cols = (

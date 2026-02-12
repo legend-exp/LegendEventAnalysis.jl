@@ -7,13 +7,16 @@ Apply the calibration specified by `data` and `sel` for the given SiPM
 `detector` to the single-detector `detector_data` for that detector.
 
 Also calculates the configured cut/flag values.
+
+# Arguments
+- `e_cal_type::Symbol=:gmm`: Calibration type to use. Either `:gmm` (Gaussian Mixture Model) or `:simple` (simple peak-based calibration).
 """
 function calibrate_spm_detector_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorId, detector_data::AbstractVector;
-    e_cal_pars_type::Symbol=:ppars, e_cal_pars_cat::Symbol=:sipmcal, dc_cut_pars_type::Symbol=:ppars,
+    e_cal_pars_type::Symbol=:ppars, e_cal_pars_cat::Symbol=:sipmcal, e_cal_type::Symbol=:gmm, dc_cut_pars_type::Symbol=:ppars,
     keep_detdata::Bool=false)
     detdata = detector_data[:]
 
-    spmcal_pf = get_spm_cal_propfunc(data, sel, detector; pars_type=e_cal_pars_type, pars_cat=e_cal_pars_cat)
+    spmcal_pf = get_spm_cal_propfunc(data, sel, detector; pars_type=e_cal_pars_type, pars_cat=e_cal_pars_cat, cal_type=e_cal_type)
     spmdc_sel_pf = get_spm_dc_sel_propfunc(data, sel, detector; pars_type=dc_cut_pars_type)
     spmdc_cal_pf = get_spm_dc_cal_propfunc(data, sel, detector; pars_type=dc_cut_pars_type)
 
