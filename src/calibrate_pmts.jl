@@ -77,7 +77,7 @@ function _muon_evt_cut(
     t_win::AbstractInterval, pmt_tstart::AbstractVector{<:Number},
     pmt_events_trig::AbstractVector{<:NamedTuple}, empty_evt::NamedTuple
 )   
-    muon_cut_idx = findall(pmt_tstart .∈ t_win)
+    muon_cut_idx = findall(in.(pmt_tstart, Ref(t_win)))
     muon_cut = Bool(length(muon_cut_idx) > 0)
 
     trig_evt::typeof(first(pmt_events_trig)) = if muon_cut
