@@ -53,8 +53,6 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     trig_e_cusp_ctc_cal = _fix_vov(getindex.(ged_events_pre.e_cusp_ctc_cal, trig_e_det))
     trig_e_535_cal      = _fix_vov(getindex.(ged_events_pre.e_535_cal, trig_e_det))
     trig_t0 = _fix_vov(getindex.(ged_events_pre.t0, trig_e_det))
-    n_trig = length.(trig_e_det)
-    n_expected_baseline = length.(ged_events_pre.is_baseline) .- length.(trig_e_det)
     
     maximum_with_init(A) = maximum(A, init=zero(eltype((A))))
 
@@ -69,7 +67,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     ged_additional_cols = (
         t0_start = min_t0.(trig_t0),
         trig_t0 = trig_t0,
-        multiplicity = n_trig,
+        multiplicity = sum(ged_events_pre.is_physical_trig),
         max_e_det_idxs = max_e_det,
         max_e_det = getindex.(ged_events_pre.detector, max_e_det),
         max_e_trap_cal = maximum_with_init.(trig_e_trap_max_cal),
@@ -84,7 +82,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
         trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
         trig_e_535_cal = trig_e_535_cal,
-        is_valid_qc = count.(ged_events_pre.is_baseline) .== n_expected_baseline,
+        is_valid_qc = all(ged_events_pre.is_baseline .|| ged_events_pre.is_physical),
         is_valid_trig = is_valid_trig.(getindex.(ged_events_pre.detector, trig_e_det), Ref(hitgeds_detectors)),
         is_valid_hit = is_valid_hit,
         is_valid_psd = all.(getindex.(ged_events_pre.psd_classifier, trig_e_det)),
