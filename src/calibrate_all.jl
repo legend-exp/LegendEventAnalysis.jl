@@ -155,7 +155,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     ), aux_events)
 
     global_events_pre = build_cross_system_events(system_events)
-    aux_cols = NamedTuple{keys(aux_events)}([StructVector(map(Broadcast.BroadcastFunction(only), columns(getproperty(global_events_pre, k)))) for k in keys(aux_events)])
+    aux_cols = NamedTuple{keys(aux_events)}([StructVector(map(Broadcast.BroadcastFunction(_safe_only), columns(getproperty(global_events_pre, k)))) for k in keys(aux_events)])
     global_events = StructVector(merge(Base.structdiff(columns(global_events_pre), NamedTuple{keys(aux_events)}), (aux = StructArray(aux_cols),)))
 
     cross_systems_cols = (
@@ -170,6 +170,26 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     return result_t, Table(pmt_events)
 end
 export calibrate_all
+
+
+"""
+    _safe_only(collection)
+
+Like `only()`, but if the collection has multiple elements, log a warning
+and return the first element instead of throwing an error.
+This handles rare cases where multiple aux entries (e.g. two forced triggers)
+fall within the same 25 µs event-building time window.
+"""
+function _safe_only(collection)
+    if length(collection) == 1
+        return only(collection)
+    elseif length(collection) > 1
+        @warn "Expected exactly 1 aux entry per event, got $(length(collection)) — using first element" maxlog=5
+        return first(collection)
+    else
+        return only(collection)  # will throw the standard error for empty collections
+    end
+end
 
 
 _fix_vov(x) = x
