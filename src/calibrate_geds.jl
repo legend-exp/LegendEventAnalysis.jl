@@ -7,10 +7,13 @@
 
 Apply the calibration specified by `data` and `sel` for the given HPGe
 `detector` to the single-detector `detector_data` for that detector.
+With the kwargs quality_cuts the type of quality cut can be chosen(default :classical).
 
 Also calculates the configured cut/flag values.
+
 """
 function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection, detector::DetectorIdLike, detector_data::AbstractVector; 
+        quality_cuts::Symbol=:classical,
         e_cal_pars_type::Symbol=:rpars, e_cal_pars_cat::Symbol=:ecal,
         psd_pars_type::Symbol=:ppars,
         aoe_cal_pars_type::Symbol=:ppars, aoe_cal_pars_cat::Symbol=:aoe, aoe_cut_pars_type::Symbol=:ppars, aoe_cut_pars_cat::Symbol=:aoe,
@@ -30,9 +33,16 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
     cut_pf = get_ged_qc_cuts_propfunc(data, sel, detector)
     
     # get qc cut functions
-    cut_is_physical_pf = get_ged_qc_is_physical_propfunc(data, sel, detector)
-    cut_is_baseline_pf = get_ged_qc_is_baseline_propfunc(data, sel, detector)
     cut_is_trig_pf = get_ged_qc_is_trig_propfunc(data, sel, detector)
+    if quality_cuts == :classical
+        cut_is_physical_pf = get_ged_qc_is_physical_classical_propfunc(data, sel, detector)
+        cut_is_baseline_pf = get_ged_qc_is_baseline_classical_propfunc(data, sel, detector)
+    elseif quality_cuts == :ml
+        cut_is_physical_pf = get_ged_qc_is_physical_ml_propfunc(data, sel, detector)
+        cut_is_baseline_pf = get_ged_qc_is_baseline_ml_propfunc(data, sel, detector)
+    else
+        throw(ArgumentError("Invalid value for `quality_cuts`: $quality_cuts. Valid options are `:classical` and `:ml`."))
+    end
     
     # get additional cols to be parsed into the event tier
     detdata_output_pf = if keep_detdata
