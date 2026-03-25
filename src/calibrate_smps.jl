@@ -39,11 +39,12 @@ export calibrate_spm_detector_data
 
 function _single_fiber_esum(
     t_win::AbstractInterval, spm_t::AbstractVector{<:Number},
-    spmdc::AbstractVector{<:Number}, spm_pe::AbstractVector{<:Number}
+    spmdc::AbstractVector{<:Number}, spm_pe::AbstractVector{<:Number},
+    pe_trig_threshold::Quantity{<:Real}
 )
     s::eltype(spm_pe) = zero(eltype(spm_pe))
     for i in eachindex(spm_t)
-        if spm_t[i] in t_win && !spmdc[i]
+        if spm_t[i] in t_win && !spmdc[i] && spm_pe[i] > pe_trig_threshold
             s += spm_pe[i]
         end
     end
@@ -55,13 +56,13 @@ function _lar_cut(
     colnames::Tuple{Symbol, Symbol, Symbol},
     t_win::AbstractInterval, spm_t::AbstractVector{<:AbstractVector{<:Number}},
     spmdc::AbstractVector{<:AbstractVector{<:Number}}, spm_pe::AbstractVector{<:AbstractVector{<:Number}},
-    pe_ch_threshold::Quantity{<:Real}, pe_sum_threshold::Quantity{<:Real}, multiplicity_threshold::Int
+    pe_trig_threshold::Quantity{<:Real}, pe_sum_threshold::Quantity{<:Real}, multiplicity_threshold::Int
 )
     n_over_thresh::Int = 0
     pe_sum::eltype(eltype(spm_pe)) = zero(eltype(eltype(spm_pe)))
     for i in eachindex(spm_t)
-        s_i = _single_fiber_esum(t_win, spm_t[i], spmdc[i], spm_pe[i])
-        if s_i > pe_ch_threshold
+        s_i = _single_fiber_esum(t_win, spm_t[i], spmdc[i], spm_pe[i], pe_trig_threshold)
+        if s_i > zero(s_i)
             n_over_thresh += 1
         end
         pe_sum += s_i
@@ -84,12 +85,12 @@ function _build_lar_cut(data::LegendData, sel::AnyValiditySelection, global_even
 
     t_wins = ClosedInterval.(geds_t0 .+ first(ged_sum_window), geds_t0 .+ last(ged_sum_window))
 
-    pe_ch_threshold = dataprod_larcut.pe_ch_threshold
+    pe_trig_threshold = dataprod_larcut_filter.pe_trig_threshold
     pe_sum_threshold = dataprod_larcut.pe_sum_threshold
     multiplicity_threshold = dataprod_larcut.multiplicity_threshold
 
     colnames = Tuple(Symbol.("$(e_filter)_" .* ["lar_cut", "spms_win_pe_sum", "spms_win_multiplicity"]))
-    return StructArray(_lar_cut.(Ref(colnames), t_wins, spm_t, spmdc, spm_pe, Ref(pe_ch_threshold), Ref(pe_sum_threshold), Ref(multiplicity_threshold)))
+    return StructArray(_lar_cut.(Ref(colnames), t_wins, spm_t, spmdc, spm_pe, Ref(pe_trig_threshold), Ref(pe_sum_threshold), Ref(multiplicity_threshold)))
 end
 
 function _build_lar_cut(data::LegendData, sel::AnyValiditySelection, global_events::AbstractVector{<:NamedTuple}, geds_t0::AbstractVector{<:Unitful.Time{<:Real}})
