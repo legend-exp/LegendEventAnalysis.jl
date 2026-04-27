@@ -2,12 +2,32 @@
 
 
 """
-    calibrate_all(data::LegendData, sel::ValiditySelection, datastore::AbstractDict)
+    calibrate_all(data::LegendData, sel::ValiditySelection, datastore)
 
 Calibrate all detectors in the given datastore, using the metadata
-processing configuration for `data` and `sel`.
+processing configuration for `data` and `sel`. `datastore` may be an
+`AbstractDataStore` (e.g. an open LH5 file) or a `NamedTuple` as returned
+by `read_ldata`.
 """
-function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDataStore, tier::DataTierLike=:jldsp)
+function calibrate_all end
+export calibrate_all
+
+# Tiny adapter so calibrate_all works unchanged on a NamedTuple from read_ldata.
+# The eager conversion to Dict{String,Any} is essential: passing the original
+# NamedTuple (with ~120 typed fields) directly would trigger specialization of
+# calibrate_all on that giant type and cause massive LLVM compile-time blow-up.
+struct _NTDataStore
+    d::Dict{String,Any}
+end
+Base.getindex(s::_NTDataStore, name::AbstractString, ::Any) = s.d[String(name)]
+Base.haskey(s::_NTDataStore, name::AbstractString) = haskey(s.d, String(name))
+
+function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::NamedTuple, tier::DataTierLike=:jldsp)
+    ds = _NTDataStore(Dict{String,Any}(string(k) => getproperty(datastore, k) for k in propertynames(datastore)))
+    return calibrate_all(data, sel, ds, tier)
+end
+
+function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::Union{AbstractDataStore, _NTDataStore}, tier::DataTierLike=:jldsp)
     ds = datastore
 
     @debug "Calibrating all detectors for `ValiditySelection` $(sel) in `DataTier` $(tier)"
@@ -169,7 +189,6 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     result_t = Table(NamedTuple{propertynames(result)}([if c isa StructArray Table(c) else c end for c in columns(result)]))
     return result_t, Table(pmt_events)
 end
-export calibrate_all
 
 
 _fix_vov(x) = x
