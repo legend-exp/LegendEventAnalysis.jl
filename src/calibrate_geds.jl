@@ -67,7 +67,7 @@ function calibrate_ged_channel_data(data::LegendData, sel::AnyValiditySelection,
 
     # get qc cut flags
     is_physical = cut_is_physical_pf.(cut_output)
-    is_trig = cut_is_trig_pf.(cut_output)
+    is_trig = cut_is_trig_pf.(cal_chdata)
     # physical trigger is a trigger which is has a physical waveform
     is_physical_trig = is_trig .&& is_physical
     # baseline is a non-physical event which is not a trigger --> can either be a baseline or a physical event which is not a trigger
