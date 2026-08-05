@@ -36,7 +36,7 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
     
     # get additional cols to be parsed into the event tier
     detdata_output_pf = if keep_detdata
-        PropSelFunction{propertynames(detdata)}()
+        PropSelFunction(propertynames(detdata)...)
     else
         get_ged_evt_detdata_propfunc(data, sel)
     end
