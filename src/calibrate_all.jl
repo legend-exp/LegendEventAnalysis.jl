@@ -2,12 +2,16 @@
 
 
 """
-    calibrate_all(data::LegendData, sel::ValiditySelection, datastore::AbstractDict)
+    calibrate_all(data::LegendData, sel::ValiditySelection, datastore::AbstractDict; include_vetoes::Bool=true)
 
 Calibrate all detectors in the given datastore, using the metadata
 processing configuration for `data` and `sel`.
+
+# Keyword arguments
+- `include_vetoes::Bool=true`: if `true` (default), all systems are calibrated.  
+  If `false`, SiPM and PMT veto systems are skipped and only HPGe (`geds`) and auxiliary (`aux`) are included in the final table.
 """
-function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDataStore, tier::DataTierLike=:jldsp)
+function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::AbstractDataStore, tier::DataTierLike=:jldsp; include_vetoes::Bool=true)
     ds = datastore
 
     @debug "Calibrating all detectors for `ValiditySelection` $(sel) in `DataTier` $(tier)"
@@ -16,12 +20,19 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     @debug "Loaded $(length(geds_detectors)) HPGe detectors"
     hitgeds_detectors::Vector{DetectorId} = filterby(get_ged_evt_hitdetsel_propfunc(data, sel))(chinfo).detector
     @debug "Loaded $(length(hitgeds_detectors)) HPGe hit detectors"
-    spms_detectors::Vector{DetectorId} = filterby(get_spms_evt_detsel_propfunc(data, sel))(chinfo).detector
-    @debug "Loaded $(length(spms_detectors)) SiPM detectors"
-    pmts_detectors::Vector{DetectorId} = filterby(get_pmts_evt_detsel_propfunc(data, sel))(chinfo).detector
-    @debug "Loaded $(length(pmts_detectors)) PMT detectors"
     aux_detectors::Vector{DetectorId} = filterby(get_aux_evt_detsel_propfunc(data, sel))(chinfo).detector
     @debug "Loaded auxiliary detectors: $(join(string.(aux_detectors), ", "))"
+
+    spms_detectors = DetectorId[]
+    pmts_detectors = DetectorId[]
+    if include_vetoes
+        spms_detectors = filterby(get_spms_evt_detsel_propfunc(data, sel))(chinfo).detector
+        @debug "Loaded $(length(spms_detectors)) SiPM detectors"
+        pmts_detectors = filterby(get_pmts_evt_detsel_propfunc(data, sel))(chinfo).detector
+        @debug "Loaded $(length(pmts_detectors)) PMT detectors"
+    else
+        @debug "Skipping (SiPM/PMT) loading (include_vetoes=false)"
+    end
 
     # HPGe:
     @debug "Calibrating HPGe detectors"
@@ -95,48 +106,57 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
 
     # SiPM:
-    @debug "Calibrating SiPM detectors"
-    spm_kwargs = get_spms_evt_kwargs(data, sel)
-    spm_caldata_v = Vector{StructVector}(undef, length(spms_detectors))
-    p = Progress(length(spms_detectors); desc="Calibrating SiPM detectors...")
-    Threads.@threads for i in eachindex(spms_detectors)
-        let detector = spms_detectors[i], detdata = ds[string(detector), tier][:]
-            spm_caldata_v[i] = calibrate_spm_detector_data(data, sel, detector, detdata; spm_kwargs...)
-            next!(p; showvalues = [("Calibrated detector", detector)])
-        end
-    end
-    spm_caldata = Dict(spms_detectors .=> spm_caldata_v)
-    @debug "Building global events for SiPM detectors"
-    spm_events_novov = build_global_events(spm_caldata, spms_detectors)
-    spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
-
-    # PMT:
-    pmt_events = if all(.!haskey.(Ref(ds), string.(pmts_detectors)))
-        @warn "No PMT data found, skip PMT calibration"
-        Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
-    else
-        @debug "Calibrating PMT detectors"
-        pmt_kwargs = get_pmts_evt_kwargs(data, sel)
-        pmt_caldata_v = Vector{StructVector}(undef, length(pmts_detectors))
-        p = Progress(length(pmts_detectors); desc="Calibrating PMT detectors...")
-        Threads.@threads for i in eachindex(pmts_detectors)
-            let detector = pmts_detectors[i], detdata = ds[string(detector), tier][:]
-                pmt_caldata_v[i] = calibrate_pmt_detector_data(data, sel, detector, detdata; pmt_kwargs...)
+    spm_events = nothing
+    if include_vetoes
+        @debug "Calibrating SiPM detectors"
+        spm_kwargs = get_spms_evt_kwargs(data, sel)
+        spm_caldata_v = Vector{StructVector}(undef, length(spms_detectors))
+        p = Progress(length(spms_detectors); desc="Calibrating SiPM detectors...")
+        Threads.@threads for i in eachindex(spms_detectors)
+            let detector = spms_detectors[i], detdata = ds[string(detector), tier][:]
+                spm_caldata_v[i] = calibrate_spm_detector_data(data, sel, detector, detdata; spm_kwargs...)
                 next!(p; showvalues = [("Calibrated detector", detector)])
             end
         end
-        pmt_caldata = Dict(pmts_detectors .=> pmt_caldata_v)
-        @debug "Building global events for PMT detectors"
-        pmt_events_pre_novov = build_global_events(pmt_caldata, pmts_detectors)
-        pmt_events_pre = StructArray(map(_fix_vov, columns(pmt_events_pre_novov)))
+        spm_caldata = Dict(spms_detectors .=> spm_caldata_v)
+        @debug "Building global events for SiPM detectors"
+        spm_events_novov = build_global_events(spm_caldata, spms_detectors)
+        spm_events = StructArray(map(_fix_vov, columns(spm_events_novov)))
+    else
+        @debug "Skipping SiPM calibration (include_vetoes=false)"
+    end
 
-        StructVector(merge(columns(_build_muon_cut(data, sel, pmt_events_pre)), columns(pmt_events_pre)))
+    # PMT:
+    pmt_events = Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
+    if include_vetoes
+        pmt_events = if all(.!haskey.(Ref(ds), string.(pmts_detectors)))
+            @warn "No PMT data found, skip PMT calibration"
+            Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
+        else
+            @debug "Calibrating PMT detectors"
+            pmt_kwargs = get_pmts_evt_kwargs(data, sel)
+            pmt_caldata_v = Vector{StructVector}(undef, length(pmts_detectors))
+            p = Progress(length(pmts_detectors); desc="Calibrating PMT detectors...")
+            Threads.@threads for i in eachindex(pmts_detectors)
+                let detector = pmts_detectors[i], detdata = ds[string(detector), tier][:]
+                    pmt_caldata_v[i] = calibrate_pmt_detector_data(data, sel, detector, detdata; pmt_kwargs...)
+                    next!(p; showvalues = [("Calibrated detector", detector)])
+                end
+            end
+            pmt_caldata = Dict(pmts_detectors .=> pmt_caldata_v)
+            @debug "Building global events for PMT detectors"
+            pmt_events_pre_novov = build_global_events(pmt_caldata, pmts_detectors)
+            pmt_events_pre = StructArray(map(_fix_vov, columns(pmt_events_pre_novov)))
+
+            StructVector(merge(columns(_build_muon_cut(data, sel, pmt_events_pre)), columns(pmt_events_pre)))
+        end
+    else
+        @debug "Skipping PMT calibration (include_vetoes=false)"
     end
 
 
     @debug "Calibrating auxiliary detectors"
-    # aux & Forced Trigger
-    aux_caldata = 
+    aux_caldata =
         [Dict(
             let detector = aux_detectors[i],
                 detdata = ds[string(detector), tier][:]
@@ -148,24 +168,34 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     # Cross-system:
     @debug "Building cross-system events"
-    system_events = merge((
-        geds = ged_events,
-        spms = spm_events,
-    ), aux_events)
+    system_events = if include_vetoes
+        merge((
+            geds = ged_events,
+            spms = spm_events,
+        ), aux_events)
+    else
+        merge((
+            geds = ged_events,
+        ), aux_events)
+    end
 
     global_events_pre = build_cross_system_events(system_events)
     # Aux channels may have duplicate entries per event from cross-system matching — take first
     aux_cols = NamedTuple{keys(aux_events)}([StructVector(map(Broadcast.BroadcastFunction(first), columns(getproperty(global_events_pre, k)))) for k in keys(aux_events)])
     global_events = StructVector(merge(Base.structdiff(columns(global_events_pre), NamedTuple{keys(aux_events)}), (aux = StructArray(aux_cols),)))
 
-    cross_systems_cols = (
-        ged_spm = _build_lar_cut(data, sel, global_events, global_events.geds.t0_start),
-        ft_spm = _build_lar_cut(data, sel, global_events, fill(get_spms_evt_lar_cut_props(data, sel).ft_cut_t0, length(global_events.geds.t0_start))),
-        ged_pmt = _build_muon_evt_cut(data, sel, global_events, pmt_events)
-    )
+    result = if include_vetoes
+        cross_systems_cols = (
+            ged_spm = _build_lar_cut(data, sel, global_events, global_events.geds.t0_start),
+            ft_spm = _build_lar_cut(data, sel, global_events, fill(get_spms_evt_lar_cut_props(data, sel).ft_cut_t0, length(global_events.geds.t0_start))),
+            ged_pmt = _build_muon_evt_cut(data, sel, global_events, pmt_events)
+        )
+        StructArray(merge(columns(global_events), cross_systems_cols))
+    else
+        @debug "Skipping cross-system veto cuts (include_vetoes=false)"
+        StructArray(columns(global_events))
+    end
 
-    result = StructArray(merge(columns(global_events), cross_systems_cols))
-    
     result_t = Table(NamedTuple{propertynames(result)}([if c isa StructArray Table(c) else c end for c in columns(result)]))
     return result_t, Table(pmt_events)
 end
