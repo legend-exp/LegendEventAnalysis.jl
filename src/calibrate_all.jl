@@ -83,13 +83,13 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
         trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
         trig_e_535_cal = trig_e_535_cal,
-        is_valid_qc = all.(map((bl, ph) -> bl .| ph, ged_events_pre.is_baseline, ged_events_pre.is_physical)),
+        is_valid_qc = all.(map((et, sp, xt) -> et .| sp .| xt, ged_events_pre.is_empty_trace, ged_events_pre.is_single_pulse, ged_events_pre.is_crosstalk)),
         is_valid_trig = is_valid_trig.(getindex.(ged_events_pre.detector, trig_e_det), Ref(hitgeds_detectors)),
         is_valid_hit = is_valid_hit,
         is_valid_psd = all.(getindex.(ged_events_pre.psd_classifier, trig_e_det)),
         is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
-        is_saturated = any.(ged_events_pre.is_saturated),
-        is_discharge = any.(ged_events_pre.is_discharge),
+        is_saturated_high = any.(ged_events_pre.is_saturated_high),
+        is_saturated_low = any.(ged_events_pre.is_saturated_low),
     )
     ged_events = StructVector(merge(columns(ged_events_pre), ged_additional_cols))
 
