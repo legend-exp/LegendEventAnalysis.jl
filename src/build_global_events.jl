@@ -74,6 +74,11 @@ end
 export build_global_event_map
 
 
+# Event columns copy the elements of nested columns instead of storing views
+# into the per-detector data:
+_evtcol_eltype(c::AbstractVector) = eltype(c)
+_evtcol_eltype(c::AbstractVector{<:AbstractArray}) = Array{eltype(eltype(c)),ndims(eltype(c))}
+
 """
     apply_event_map(data::StructVector, evtmap::StructVector)
 
@@ -84,7 +89,7 @@ Apply the event map `evtmap` to the data `data`.
 """
 function apply_event_map(data::StructVector, evtmap::StructVector)
     data_cols = columns(data)
-    evt_cols = map(c -> VectorOfVectors{eltype(c)}(), data_cols)
+    evt_cols = map(c -> VectorOfVectors{_evtcol_eltype(c)}(), data_cols)
 
     map(data_cols, evt_cols) do c, ac
         for idx in evtmap.dataidx
