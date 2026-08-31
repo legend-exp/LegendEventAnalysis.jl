@@ -2,6 +2,12 @@
 
 const _VALID_CALIBRATE_ALL_SUBSYSTEMS = (:geds, :spms, :pmts, :aux)
 
+# per-detector data from an open LH5 store (tier/<det>) or from a read_ldata NamedTuple
+_detdata(ds::NamedTuple, detector, tier) = ds[Symbol(detector)]
+_detdata(ds, detector, tier) = ds[tier, string(detector)][:]
+_hasdet(ds::NamedTuple, detector, tier) = haskey(ds, Symbol(detector))
+_hasdet(ds, detector, tier) = haskey(ds, "$tier/$detector")
+
 """
     calibrate_all(data::LegendData, sel::ValiditySelection, datastore::AbstractDict; subsystems::Vector{Symbol}=[:geds, :spms, :pmts, :aux])
 
@@ -52,7 +58,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         ged_caldata_v = Vector{StructVector}(undef, length(geds_detectors))
         p = Progress(length(geds_detectors); desc="Calibrating HPGe detectors...")
         Threads.@threads for i in eachindex(geds_detectors)
-            let detector = geds_detectors[i], detdata = ds[string(detector), tier][:]
+            let detector = geds_detectors[i], detdata = _detdata(ds, detector, tier)
                 ged_caldata_v[i] = calibrate_ged_detector_data(data, sel, detector, detdata; ged_kwargs...)
                 next!(p; showvalues = [("Calibrated detector", detector)])
             end
@@ -130,7 +136,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         spm_caldata_v = Vector{StructVector}(undef, length(spms_detectors))
         p = Progress(length(spms_detectors); desc="Calibrating SiPM detectors...")
         Threads.@threads for i in eachindex(spms_detectors)
-            let detector = spms_detectors[i], detdata = ds[string(detector), tier][:]
+            let detector = spms_detectors[i], detdata = _detdata(ds, detector, tier)
                 spm_caldata_v[i] = calibrate_spm_detector_data(data, sel, detector, detdata; spm_kwargs...)
                 next!(p; showvalues = [("Calibrated detector", detector)])
             end
@@ -149,7 +155,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         pmts_detectors::Vector{DetectorId} = filterby(get_pmts_evt_detsel_propfunc(data, sel))(chinfo).detector
         @debug "Loaded $(length(pmts_detectors)) PMT detectors"
 
-        pmt_events = if all(.!haskey.(Ref(ds), string.(pmts_detectors)))
+        pmt_events = if all(.!_hasdet.(Ref(ds), pmts_detectors, Ref(tier)))
             @warn "No PMT data found, skip PMT calibration"
             Vector{NamedTuple{(:timestamp, ), Tuple{Unitful.Time{<:Real}, }}}()
         else
@@ -158,7 +164,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
             pmt_caldata_v = Vector{StructVector}(undef, length(pmts_detectors))
             p = Progress(length(pmts_detectors); desc="Calibrating PMT detectors...")
             Threads.@threads for i in eachindex(pmts_detectors)
-                let detector = pmts_detectors[i], detdata = ds[string(detector), tier][:]
+                let detector = pmts_detectors[i], detdata = _detdata(ds, detector, tier)
                     pmt_caldata_v[i] = calibrate_pmt_detector_data(data, sel, detector, detdata; pmt_kwargs...)
                     next!(p; showvalues = [("Calibrated detector", detector)])
                 end
@@ -184,7 +190,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
         aux_caldata =
             [Dict(
                 let detector = aux_detectors[i],
-                    detdata = ds[string(detector), tier][:]
+                    detdata = _detdata(ds, detector, tier)
                     detector => calibrate_aux_detector_data(data, sel, detector, detdata)
                 end
                 ) for i in eachindex(aux_detectors)]
