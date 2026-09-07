@@ -6,6 +6,7 @@ module LegendEventAnalysis
 
 using ArraysOfArrays
 using StructArrays
+using Statistics: mean, median, std
 using Unitful, UnitfulAtomic
 
 using LegendDataManagement
@@ -29,5 +30,6 @@ include("calibrate_smps.jl")
 include("calibrate_pmts.jl")
 include("calibrate_aux.jl")
 include("calibrate_all.jl")
+include("time_series.jl")
 
 end # module
