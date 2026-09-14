@@ -6,7 +6,13 @@ module LegendEventAnalysis
 
 using ArraysOfArrays
 using StructArrays
+import Statistics
+using Statistics: mean, median, std
 using Unitful, UnitfulAtomic
+using Dates: DateTime, unix2datetime
+import Dates
+import Measurements
+using Measurements: measurement
 
 using LegendDataManagement
 
@@ -29,5 +35,6 @@ include("calibrate_smps.jl")
 include("calibrate_pmts.jl")
 include("calibrate_aux.jl")
 include("calibrate_all.jl")
+include("time_evolution.jl")
 
 end # module
