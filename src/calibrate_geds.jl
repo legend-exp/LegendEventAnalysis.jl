@@ -18,6 +18,7 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
         keep_detdata::Bool=false)
     
     detector = DetectorId(detector)
+    chinfo = channelinfo(data, sel, detector)
 
     # get all detdata
     detdata = detector_data[:]
@@ -30,7 +31,11 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
     cut_pf = get_ged_qc_cuts_propfunc(data, sel, detector)
     
     # get qc cut functions
-    cut_is_single_pulse_pf = get_ged_qc_is_single_pulse_propfunc(data, sel, detector)
+    if chinfo.usability == :ac
+        cut_is_single_pulse_pf = get_ged_qc_is_single_pulse_ac_propfunc(data, sel, detector)
+    else
+        cut_is_single_pulse_pf = get_ged_qc_is_single_pulse_propfunc(data, sel, detector)
+    end
     cut_is_empty_trace_pf = get_ged_qc_is_empty_trace_propfunc(data, sel, detector)
     cut_is_crosstalk_pf = get_ged_qc_is_crosstalk_propfunc(data, sel, detector)
     cut_is_trig_pf = get_ged_qc_is_trig_propfunc(data, sel, detector)
