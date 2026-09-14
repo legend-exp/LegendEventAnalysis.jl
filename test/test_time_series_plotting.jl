@@ -36,4 +36,14 @@ import Makie
         uncertainty = fill(0.1u"keV", 5))
     fig = lplot(unitful; sigmas = (1,))
     @test count(p -> p isa Makie.Band, content(fig[1, 1]).scene.plots) == 1
+
+    fig = lplot(unitful; plot = Makie.scatterlines!, uncertainty_style = :bars, linestyle = :dash)
+    plots = content(fig[1, 1]).scene.plots
+    @test count(p -> p isa Makie.Errorbars, plots) == 1
+    @test count(p -> p isa Makie.ScatterLines, plots) == 1
+    @test !any(p -> p isa Makie.Band, plots)
+
+    fig = lplot(unitful; plot = Makie.scatter!, uncertainty_style = :none)
+    @test only(content(fig[1, 1]).scene.plots) isa Makie.Scatter
+    @test_throws ArgumentError lplot(unitful; uncertainty_style = :invalid)
 end

@@ -23,24 +23,19 @@ end
 export TimeSeriesStruct
 
 """
-    gain_stability(time, energy; Qbb = 2039.0, n_ref = 500, n_smooth = 201)
+    gain_stability(time, energy; Qbb = 2039.0, n_ref = 500, n_smooth = 200)
 
 Return a `TimeSeriesStruct` of gain-induced energy shifts at `Qbb` for one
 energy estimator. Subtract the median of the first `n_ref` samples and scale
 by `Qbb / first(energy)`, then compute a centered rolling mean and sample
 standard deviation. Windows are truncated at the edges; a singleton has zero
-spread. The window radius is `n_smooth ÷ 2`. Nonfinite time/energy pairs are
-removed before normalization. Remaining times stay absolute and unchanged.
+spread. The window radius is `n_smooth ÷ 2`. Times stay absolute and unchanged.
+The caller must provide nonempty, finite inputs, a nonzero first energy, and
+positive `n_ref` and `n_smooth`. Remove nonfinite time/energy pairs before calling
+this function; it does not filter or validate these inputs.
 Use two reports to overlay pulser and reconstructed-energy stability.
 """
-function gain_stability(time::AbstractVector, energy::AbstractVector; Qbb = 2039.0, n_ref::Integer = 500, n_smooth::Integer = 201)
-    length(time) == length(energy) || throw(DimensionMismatch("time and energy must have equal lengths"))
-    n_ref > 0 || throw(ArgumentError("n_ref must be positive"))
-    n_smooth > 0 || throw(ArgumentError("n_smooth must be positive"))
-    finite = isfinite.(time) .& isfinite.(energy)
-    any(finite) || throw(ArgumentError("no finite gain-stability samples"))
-    time, energy = time[finite], energy[finite]
-    iszero(first(energy)) && throw(ArgumentError("reference energy must be nonzero"))
+function gain_stability(time::AbstractVector, energy::AbstractVector; Qbb = 2039.0, n_ref::Integer = 500, n_smooth::Integer = 200)
     reference = median(@view energy[1:min(n_ref, length(energy))])
     shifts = (energy .- reference) ./ first(energy) .* Qbb
     halfwidth = n_smooth ÷ 2
