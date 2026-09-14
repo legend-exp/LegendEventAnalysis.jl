@@ -30,8 +30,9 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
     cut_pf = get_ged_qc_cuts_propfunc(data, sel, detector)
     
     # get qc cut functions
-    cut_is_physical_pf = get_ged_qc_is_physical_propfunc(data, sel, detector)
-    cut_is_baseline_pf = get_ged_qc_is_baseline_propfunc(data, sel, detector)
+    cut_is_single_pulse_pf = get_ged_qc_is_single_pulse_propfunc(data, sel, detector)
+    cut_is_empty_trace_pf = get_ged_qc_is_empty_trace_propfunc(data, sel, detector)
+    cut_is_crosstalk_pf = get_ged_qc_is_crosstalk_propfunc(data, sel, detector)
     cut_is_trig_pf = get_ged_qc_is_trig_propfunc(data, sel, detector)
     
     # get additional cols to be parsed into the event tier
@@ -66,14 +67,16 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
     detdata_output = detdata_output_pf.(detdata)
 
     # get qc cut flags
-    is_physical = cut_is_physical_pf.(cut_output)
-    is_baseline = cut_is_baseline_pf.(cut_output)
-    is_physical_trig = cut_is_trig_pf.(cal_detdata) .&& is_physical
+    is_single_pulse = cut_is_single_pulse_pf.(cut_output)
+    is_empty_trace = cut_is_empty_trace_pf.(cut_output)
+    is_crosstalk = cut_is_crosstalk_pf.(cut_output)
+    is_physical_trig = cut_is_trig_pf.(cal_detdata) .&& is_single_pulse
 
     
     additional_qc_cols = (
-        is_physical = is_physical,
-        is_baseline = is_baseline,
+        is_single_pulse = is_single_pulse,
+        is_empty_trace = is_empty_trace,
+        is_crosstalk = is_crosstalk,
         is_physical_trig = is_physical_trig,
     )
 

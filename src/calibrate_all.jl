@@ -88,36 +88,34 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
             is_valid_hit .&= all.(map.(isfinite, (getindex.(getproperty(ged_events_pre, prop), trig_e_det))))
         end
 
-        ged_additional_cols = (
-            t0_start = min_t0.(trig_t0),
-            trig_t0 = trig_t0,
-            multiplicity = n_trig,
-            max_e_det_idxs = max_e_det,
-            max_e_det = getindex.(ged_events_pre.detector, max_e_det),
-            max_e_trap_cal = maximum_with_init.(trig_e_trap_max_cal),
-            max_e_cusp_cal = maximum_with_init.(trig_e_cusp_max_cal),
-            max_e_trap_ctc_cal = maximum_with_init.(trig_e_trap_ctc_cal),
-            max_e_cusp_ctc_cal = maximum_with_init.(trig_e_cusp_ctc_cal),
-            max_e_short_cal = maximum_with_init.(trig_e_535_cal),
-            trig_e_det_idxs = trig_e_det,
-            trig_e_det = getindex.(ged_events_pre.detector, trig_e_det),
-            trig_e_trap_max_cal = trig_e_trap_max_cal,
-            trig_e_cusp_max_cal = trig_e_cusp_max_cal,
-            trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
-            trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
-            trig_e_535_cal = trig_e_535_cal,
-            is_valid_qc = all.(map((bl, ph) -> bl .| ph, ged_events_pre.is_baseline, ged_events_pre.is_physical)),
-            is_valid_trig = is_valid_trig.(getindex.(ged_events_pre.detector, trig_e_det), Ref(hitgeds_detectors)),
-            is_valid_hit = is_valid_hit,
-            is_valid_psd = all.(getindex.(ged_events_pre.psd_classifier, trig_e_det)),
-            is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
-            is_saturated = any.(ged_events_pre.is_saturated),
-            is_discharge = any.(ged_events_pre.is_discharge),
-        )
-        ged_events = StructVector(merge(columns(ged_events_pre), ged_additional_cols))
-    else
-        @debug "Skipping HPGe calibration (:geds not in subsystems)"
-    end
+    ged_additional_cols = (
+        t0_start = min_t0.(trig_t0),
+        trig_t0 = trig_t0,
+        multiplicity = n_trig,
+        max_e_det_idxs = max_e_det,
+        max_e_det = getindex.(ged_events_pre.detector, max_e_det),
+        max_e_trap_cal = maximum_with_init.(trig_e_trap_max_cal),
+        max_e_cusp_cal = maximum_with_init.(trig_e_cusp_max_cal),
+        max_e_trap_ctc_cal = maximum_with_init.(trig_e_trap_ctc_cal),
+        max_e_cusp_ctc_cal = maximum_with_init.(trig_e_cusp_ctc_cal),
+        max_e_short_cal = maximum_with_init.(trig_e_535_cal),
+        trig_e_det_idxs = trig_e_det,
+        trig_e_det = getindex.(ged_events_pre.detector, trig_e_det),
+        trig_e_trap_max_cal = trig_e_trap_max_cal,
+        trig_e_cusp_max_cal = trig_e_cusp_max_cal,
+        trig_e_trap_ctc_cal = trig_e_trap_ctc_cal,
+        trig_e_cusp_ctc_cal = trig_e_cusp_ctc_cal,
+        trig_e_535_cal = trig_e_535_cal,
+        is_valid_qc = all.(map((et, sp, xt) -> et .| sp .| xt, ged_events_pre.is_empty_trace, ged_events_pre.is_single_pulse, ged_events_pre.is_crosstalk)),
+        is_valid_trig = is_valid_trig.(getindex.(ged_events_pre.detector, trig_e_det), Ref(hitgeds_detectors)),
+        is_valid_hit = is_valid_hit,
+        is_valid_psd = all.(getindex.(ged_events_pre.psd_classifier, trig_e_det)),
+        is_discharge_recovery = any.(ged_events_pre.is_discharge_recovery_ml),
+        is_saturated_high = any.(ged_events_pre.is_saturated_high),
+        is_saturated_low = any.(ged_events_pre.is_saturated_low),
+    )
+    ged_events = StructVector(merge(columns(ged_events_pre), ged_additional_cols))
+
 
     # SiPM:
     spm_events = nothing
