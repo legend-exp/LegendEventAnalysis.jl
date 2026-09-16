@@ -19,14 +19,15 @@ r = rate(timestamp, 10u"minute")            # events per second, √N uncertaint
 
 - `smooth(ts, Δt)` averages over consecutive windows of width `Δt` and
   reports the spread of each window as the uncertainty.
+- `smooth(ts, n)` does the same over consecutive windows of `n` samples.
 - `relative(ts, reference)` normalizes to the mean of the first `reference`
   samples (an `Integer`) or of the samples within a time span after the first
   timestamp. Units cancel; uncertainties propagate.
 - `rate(timestamps, Δt)` counts events per window and reports the rate in Hz.
   Only windows fully covered by the data span are included.
 
-Window widths and reference spans accept `Dates.Period`s (`Hour(1)`) as well
-as unitful times (`1u"hr"`).
+Time-based window widths and reference spans accept `Dates.Period`s (`Hour(1)`)
+as well as unitful times (`1u"hr"`).
 
 `smooth` takes any statistic as a third argument; `mean` (the default) adds
 the window spread as uncertainty and `extrema` yields `ClosedInterval`s, which

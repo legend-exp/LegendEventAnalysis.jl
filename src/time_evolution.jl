@@ -77,19 +77,28 @@ function _windows(time::AbstractVector{<:DateTime}, Δt::Dates.Period)
 end
 
 """
-    smooth(ts::TimeEvolution, Δt, f = mean)
+    smooth(ts::TimeEvolution, window, f = mean)
 
-Reduce `ts` over consecutive windows of width `Δt` (a `Dates.Period` or unitful
-time) with the statistic `f`. Each non-empty window yields one sample at the
-window center. `f = mean` gives the window mean with the sample standard
-deviation as uncertainty (zero for a single sample; input uncertainties are
-not propagated); `f = extrema` gives a `ClosedInterval`; any other `f` is
-applied to the window values as is.
+Reduce `ts` over consecutive windows with the statistic `f`. `window` is either
+the number of samples in each window or its duration (a `Dates.Period` or
+unitful time). Each window yields one sample at its center. `f = mean` gives the
+window mean with the sample standard deviation as uncertainty (zero for a
+single sample; input uncertainties are not propagated); `f = extrema` gives a
+`ClosedInterval`; any other `f` is applied to the window values as is.
 """
-function smooth(ts::TimeEvolution, Δt, f = mean)
+function smooth(ts::TimeEvolution, window, f = mean)
+    time, windows = _smoothing_windows(ts, window)
+    TimeEvolution(time, [f(view(ts.values, idxs)) for idxs in windows])
+end
+function _smoothing_windows(ts::TimeEvolution, n::Integer)
+    windows = [i:min(i + n - 1, lastindex(ts.values)) for i in firstindex(ts.values):n:lastindex(ts.values)]
+    time = [ts.time[first(idxs)] + (ts.time[last(idxs)] - ts.time[first(idxs)]) ÷ 2 for idxs in windows]
+    time, windows
+end
+function _smoothing_windows(ts::TimeEvolution, Δt)
     Δt = _period(Δt)
     windows = filter(w -> !isempty(last(w)), _windows(ts.time, Δt))
-    TimeEvolution([start + Δt ÷ 2 for (start, _) in windows], [f(view(ts.values, idxs)) for (_, idxs) in windows])
+    [start + Δt ÷ 2 for (start, _) in windows], last.(windows)
 end
 smooth(ts::TimeEvolution, Δt, ::typeof(mean)) = smooth(ts, Δt, _mean_spread)
 smooth(ts::TimeEvolution, Δt, ::typeof(extrema)) = smooth(ts, Δt, v -> ClosedInterval(extrema(v)...))

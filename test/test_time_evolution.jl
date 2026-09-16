@@ -33,6 +33,11 @@ using IntervalSets: (..)
         @test Measurements.uncertainty.(s.values) ≈ [std(1000.0:2.0:1006.0), std(1008.0:2.0:1014.0), std(1016.0:2.0:1018.0)] .* u"keV"
         @test smooth(ts, Minute(4)).values == s.values
 
+        by_count = smooth(ts, 4)
+        @test by_count.time == t0 .+ Millisecond.([90_000, 330_000, 510_000])
+        @test Measurements.value.(by_count.values) == Measurements.value.(s.values)
+        @test Measurements.uncertainty.(by_count.values) == Measurements.uncertainty.(s.values)
+
         @test Measurements.uncertainty(only(smooth(ts, 20u"minute").values)) ≈ std(ustrip.(energy)) * u"keV"
         # A window holding a single sample has zero spread.
         @test all(iszero, Measurements.uncertainty.(smooth(ts, 1u"minute").values))
