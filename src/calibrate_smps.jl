@@ -99,12 +99,11 @@ end
 
 
 function _geom_spms(data::LegendData, sel::AnyValiditySelection, dphi_max)
-    geometry = data.metadata.hardware.geometry
-    spms_geometry = geometry.spms(sel)
-    return Dict(
-        DetectorId(hpge) => Set(DetectorId(spm) for (spm, rel) in rel_spms if abs(rel.dphi) <= dphi_max[Symbol(spms_geometry[spm].barrel)])
-        for (hpge, rel_spms) in geometry.relative(sel)
-    )
+    geds = channelinfo(data, sel; system = :geds, extended = true, verbose = false)
+    spms = channelinfo(data, sel; system = :spms, extended = true, verbose = false)
+    all(isfinite, geds.angle) && all(isfinite, spms.angle) || throw(ArgumentError("Geometric LAr cut needs the azimuth of every HPGe and SiPM detector in the hardware geometry metadata"))
+    dphi(spm, ged) = abs(mod(spm.angle - ged.angle + 180u"°", 360u"°") - 180u"°")
+    return Dict(ged.detector => Set(spm.detector for spm in spms if dphi(spm, ged) <= dphi_max[spm.barrel]) for ged in geds)
 end
 
 _geom_spms_idxs(geom_spms::AbstractDict, trig_e_det::AbstractVector{<:DetectorId}, spm_det::AbstractVector{<:DetectorId}) = findall(spm -> any(spm in geom_spms[det] for det in trig_e_det), spm_det)
