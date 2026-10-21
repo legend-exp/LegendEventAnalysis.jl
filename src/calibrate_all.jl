@@ -220,10 +220,10 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
 
     cross_systems_cols = NamedTuple()
     if :geds in subsystems && :spms in subsystems
-        cross_systems_cols = merge(cross_systems_cols, (ged_spm = _build_lar_cut(data, sel, global_events, global_events.geds.t0_start),))
+        cross_systems_cols = merge(cross_systems_cols, (ged_spm = _build_lar_cut(data, sel, global_events, global_events.geds.t0_start, global_events.geds.trig_e_det),))
     end
     if :spms in subsystems
-        cross_systems_cols = merge(cross_systems_cols, (ft_spm = _build_lar_cut(data, sel, global_events, fill(get_spms_evt_lar_cut_props(data, sel).ft_cut_t0, length(global_events))),))
+        cross_systems_cols = merge(cross_systems_cols, (ft_spm = _build_lar_cut(data, sel, global_events, fill(get_spms_evt_lar_cut_props(data, sel).ft_cut_t0, length(global_events)), nothing),))
     end
     if :geds in subsystems && :pmts in subsystems
         cross_systems_cols = merge(cross_systems_cols, (ged_pmt = _build_muon_evt_cut(data, sel, global_events, pmt_events),))
