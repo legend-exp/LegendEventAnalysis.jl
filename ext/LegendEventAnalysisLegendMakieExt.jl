@@ -48,18 +48,17 @@ function LegendMakie.lplot!(ax::Makie.Axis, ts::TimeEvolution{<:AbstractVector{<
     ax.parent
 end
 
-function LegendMakie.lplot!(ts::TimeEvolution;
+function LegendMakie.lplot!(fig::Makie.Figure, ts::TimeEvolution;
     row = 1, col = 1, xlabel = "Time", ylabel = "", title = "", ylims = nothing,
     axis = (;), boundaries = [], watermark = false, watermark_options = (;), kwargs...)
 
-    fig = Makie.current_figure()
     ax = Makie.Axis(fig[row, col]; xlabel, ylabel, title, axis...)
     LegendMakie.lplot!(ax, ts; kwargs...)
     isnothing(ylims) || Makie.ylims!(ax, ylims...)
     isempty(boundaries) || Makie.vlines!(ax.scene, Makie.convert_dim_value.(Ref(ax), 1, boundaries);
         color = :gray, linestyle = :dash, dim_conversions = Makie.DimConversions())
-    Makie.current_axis!(ax)
-    watermark && LegendMakie.add_watermarks!(; watermark_options...)
+    Makie.current_axis!(fig, ax)
+    watermark && LegendMakie.add_watermarks!(fig, ax; watermark_options...)
     fig
 end
 
