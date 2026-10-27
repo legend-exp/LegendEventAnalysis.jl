@@ -128,10 +128,12 @@ function _build_lar_cut(
     # pe sums and multiplicities over all SiPMs for every window
     cols = _spms_win_sums(windows, t_wins, "$(e_filter)_spms_", spm_t, spmdc, spm_pe)
 
-    # cut flags, a cut with dphi_max runs on the SiPMs near the triggered HPGe detectors and stores its own sums
+    # cut flags: a cut runs on the SiPMs within `dphi_max` (per barrel) of the triggered HPGe detectors and stores their
+    # sums; with 180° in every barrel it runs on all SiPMs
     for cut_name in sort!(collect(keys(dataprod_larcut.cuts)))
         cut = dataprod_larcut.cuts[cut_name]
-        if haskey(cut, :dphi_max)
+        haskey(cut, :dphi_max) || throw(ArgumentError("LAr cut `$cut_name` has no `dphi_max`"))
+        if any(<(180u"°"), values(cut.dphi_max))
             isnothing(trig_e_det) && continue
             geom_idxs = _geom_spms_idxs.(Ref(_geom_spms(data, sel, cut.dphi_max)), trig_e_det, global_events.spms.detector)
             cut_t, cut_dc, cut_pe = view.(spm_t, geom_idxs), view.(spmdc, geom_idxs), view.(spm_pe, geom_idxs)
