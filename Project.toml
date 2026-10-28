@@ -5,6 +5,7 @@ version = "0.3.4"
 [deps]
 ArraysOfArrays = "65a8f2f4-9b39-5baf-92e2-a9cc46fdf018"
 Dates = "ade2ca70-3891-5945-98fb-dc099432e06a"
+FillArrays = "1a297f60-69ca-5386-bcde-b61e274b549b"
 IntervalSets = "8197267c-284f-5f27-9208-e0e47529a953"
 LegendDataManagement = "9feedd95-f0e0-423f-a8dc-de0970eae6b3"
 LegendDataTypes = "99e09c13-5545-5ee2-bfa2-77f358fb75d8"
@@ -28,8 +29,9 @@ LegendEventAnalysisLegendMakieExt = ["LegendMakie", "Makie"]
 [compat]
 ArraysOfArrays = "0.6.5, 1"
 Dates = "1"
+FillArrays = "1"
 IntervalSets = "0.6, 0.7"
-LegendDataManagement = "0.6"
+LegendDataManagement = "0.6.20"
 LegendDataTypes = "0.1.4"
 LegendMakie = "0.2"
 Makie = "0.24.4"

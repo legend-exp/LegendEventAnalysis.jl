@@ -98,9 +98,12 @@ function _lar_cut(
 end
 
 
-function _geom_spms(data::LegendData, sel::AnyValiditySelection, dphi_max)
-    geds = channelinfo(data, sel; system = :geds, extended = true, verbose = false)
-    spms = channelinfo(data, sel; system = :spms, extended = true, verbose = false)
+# a cut with less than 180° in a SiPM barrel only uses the SiPMs near the triggered HPGe detectors
+_is_geometric(cut) = any(<(180u"°"), values(cut.dphi_max))
+
+# the SiPMs within `dphi_max` (per barrel) in azimuth of each HPGe detector, from the extended channel info of the HPGe
+# and SiPM detectors
+function _geom_spms(geds, spms, dphi_max)
     all(isfinite, geds.angle) && all(isfinite, spms.angle) || throw(ArgumentError("Geometric LAr cut needs the azimuth of every HPGe and SiPM detector in the hardware geometry metadata"))
     dphi(spm, ged) = abs(mod(spm.angle - ged.angle + 180u"°", 360u"°") - 180u"°")
     return Dict(ged.detector => Set(spm.detector for spm in spms if dphi(spm, ged) <= dphi_max[spm.barrel]) for ged in geds)
@@ -110,8 +113,8 @@ _geom_spms_idxs(geom_spms::AbstractDict, trig_e_det::AbstractVector{<:DetectorId
 
 
 function _build_lar_cut(
-    data::LegendData, sel::AnyValiditySelection, global_events::AbstractVector{<:NamedTuple},
-    geds_t0::AbstractVector{<:Unitful.Time{<:Real}}, trig_e_det::Union{Nothing, AbstractVector{<:AbstractVector{<:DetectorId}}}, e_filter::Symbol
+    data::LegendData, sel::AnyValiditySelection, geom_spms::AbstractDict, global_events::AbstractVector{<:NamedTuple},
+    geds_t0::AbstractVector{<:Unitful.Time{<:Real}}, trig_e_det::AbstractVector{<:AbstractVector{<:DetectorId}}, e_filter::Symbol
 )
     dataprod_larcut = get_spms_evt_lar_cut_props(data, sel)
     dataprod_larcut_filter = dataprod_larcut.energy_types[e_filter]
@@ -128,12 +131,13 @@ function _build_lar_cut(
     # pe sums and multiplicities over all SiPMs for every window
     cols = _spms_win_sums(windows, t_wins, "$(e_filter)_spms_", spm_t, spmdc, spm_pe)
 
-    # cut flags, a cut with dphi_max runs on the SiPMs near the triggered HPGe detectors and stores its own sums
+    # cut flags: a cut runs on the SiPMs within `dphi_max` (per barrel) of the triggered HPGe detectors and stores their
+    # sums (no SiPMs, so zero sums and no cut, for an event without a triggered HPGe detector); with 180° in every barrel
+    # it runs on all SiPMs
     for cut_name in sort!(collect(keys(dataprod_larcut.cuts)))
         cut = dataprod_larcut.cuts[cut_name]
-        if haskey(cut, :dphi_max)
-            isnothing(trig_e_det) && continue
-            geom_idxs = _geom_spms_idxs.(Ref(_geom_spms(data, sel, cut.dphi_max)), trig_e_det, global_events.spms.detector)
+        if haskey(geom_spms, cut_name)
+            geom_idxs = _geom_spms_idxs.(Ref(geom_spms[cut_name]), trig_e_det, global_events.spms.detector)
             cut_t, cut_dc, cut_pe = view.(spm_t, geom_idxs), view.(spmdc, geom_idxs), view.(spm_pe, geom_idxs)
             cols = merge(cols, _spms_win_sums(windows, t_wins, "$(e_filter)_spms_$(cut_name)_", cut_t, cut_dc, cut_pe))
         else
@@ -152,15 +156,19 @@ function _build_lar_cut(
 end
 
 function _build_lar_cut(
-    data::LegendData, sel::AnyValiditySelection, global_events::AbstractVector{<:NamedTuple},
-    geds_t0::AbstractVector{<:Unitful.Time{<:Real}}, trig_e_det::Union{Nothing, AbstractVector{<:AbstractVector{<:DetectorId}}}
+    data::LegendData, sel::AnyValiditySelection, geds, spms, global_events::AbstractVector{<:NamedTuple},
+    geds_t0::AbstractVector{<:Unitful.Time{<:Real}}, trig_e_det::AbstractVector{<:AbstractVector{<:DetectorId}}
 )
     dataprod_larcut = get_spms_evt_lar_cut_props(data, sel)
     energy_types = keys(dataprod_larcut.energy_types)
+    for (cut_name, cut) in pairs(dataprod_larcut.cuts)
+        haskey(cut, :dphi_max) || throw(ArgumentError("LAr cut `$cut_name` has no `dphi_max`"))
+    end
+    geom_spms = Dict(cut_name => _geom_spms(geds, spms, cut.dphi_max) for (cut_name, cut) in pairs(dataprod_larcut.cuts) if _is_geometric(cut))
 
     is_valid_lar_propfunc = ljl_propfunc(dataprod_larcut.is_valid_lar)
     
-    lar_cuts = _build_lar_cut.(Ref(data), Ref(sel), Ref(global_events), Ref(geds_t0), Ref(trig_e_det), energy_types)
+    lar_cuts = _build_lar_cut.(Ref(data), Ref(sel), Ref(geom_spms), Ref(global_events), Ref(geds_t0), Ref(trig_e_det), energy_types)
     lar_cut = StructArray(merge(getproperty.(lar_cuts, :cols)...))
     spm = StructArray(merge((detector = global_events.spms.detector,), getproperty.(lar_cuts, :spm_cols)...))
     return StructArray(merge((is_valid_lar = is_valid_lar_propfunc.(lar_cut),), columns(lar_cut), (spm = spm,)))

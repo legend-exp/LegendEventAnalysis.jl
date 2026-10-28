@@ -16,6 +16,7 @@ using Measurements: measurement
 
 using LegendDataManagement
 
+using FillArrays: Fill
 using IntervalSets: AbstractInterval, ClosedInterval, leftendpoint, rightendpoint
 using ProgressMeter
 using PropertyFunctions: PropertyFunction, @pf, filterby, PropSelFunction
