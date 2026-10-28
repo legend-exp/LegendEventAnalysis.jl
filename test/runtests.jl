@@ -6,6 +6,7 @@ Test.@testset "Package LegendEventAnalysis" begin
     # include("test_aqua.jl")
 
     include("test_build_global_events.jl")
+    include("test_lar_cut.jl")
     include("test_time_evolution.jl")
     include("test_time_evolution_plotting.jl")
 
