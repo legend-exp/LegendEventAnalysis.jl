@@ -19,7 +19,9 @@ processing configuration for `data` and `sel`.
   added to the result table when *all* of the subsystems they need are
   selected:
   - `ged_spm` needs `:geds` and `:spms`
-  - `ft_spm` needs `:spms`
+  - `ft_spm` needs `:spms`; besides the LAr cut of the forced triggers, it has a
+    column `detstring<n>` for every HPGe string `n` with the LAr cut as if the
+    HPGe detectors of that string had triggered
   - `ged_pmt` needs `:geds` and `:pmts`
 
   At least one of `:geds`, `:spms` or `:aux` must be selected, since these
@@ -37,7 +39,7 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     end
 
     @debug "Calibrating all detectors for `ValiditySelection` $(sel) in `DataTier` $(tier), subsystems: $(subsystems)"
-    chinfo = channelinfo(data, sel)
+    chinfo = channelinfo(data, sel; extended = true)
 
     # HPGe:
     ged_events = nothing
@@ -219,11 +221,25 @@ function calibrate_all(data::LegendData, sel::AnyValiditySelection, datastore::A
     end
 
     cross_systems_cols = NamedTuple()
+    if :spms in subsystems
+        # the HPGe and SiPM detectors of the event tier, with the azimuths for the geometric LAr cut
+        lar_geds = filterby(get_ged_evt_detsel_propfunc(data, sel))(chinfo)
+        lar_spms = filterby(get_spms_evt_detsel_propfunc(data, sel))(chinfo)
+    end
     if :geds in subsystems && :spms in subsystems
-        cross_systems_cols = merge(cross_systems_cols, (ged_spm = _build_lar_cut(data, sel, global_events, global_events.geds.t0_start),))
+        cross_systems_cols = merge(cross_systems_cols, (ged_spm = _build_lar_cut(data, sel, lar_geds, lar_spms, global_events, global_events.geds.t0_start, global_events.geds.trig_e_det),))
     end
     if :spms in subsystems
-        cross_systems_cols = merge(cross_systems_cols, (ft_spm = _build_lar_cut(data, sel, global_events, fill(get_spms_evt_lar_cut_props(data, sel).ft_cut_t0, length(global_events))),))
+        # forced triggers have no triggered HPGe detector; `detstring<n>` is the LAr cut as if the HPGe detectors of string
+        # `n` had triggered (they share the azimuth), without the per-SiPM sums
+        ft_t0 = Fill(get_spms_evt_lar_cut_props(data, sel).ft_cut_t0, length(global_events))
+        ft_spm = _build_lar_cut(data, sel, lar_geds, lar_spms, global_events, ft_t0, Fill(DetectorId[], length(global_events)))
+        ft_strings = map(sort!(unique(lar_geds.detstring))) do s
+            string_det = Fill([lar_geds.detector[findfirst(==(s), lar_geds.detstring)]], length(global_events))
+            string_cut = _build_lar_cut(data, sel, lar_geds, lar_spms, global_events, ft_t0, string_det)
+            Symbol(:detstring, s) => StructArray(Base.structdiff(columns(string_cut), (spm = nothing,)))
+        end
+        cross_systems_cols = merge(cross_systems_cols, (ft_spm = StructArray(merge(columns(ft_spm), NamedTuple(ft_strings))),))
     end
     if :geds in subsystems && :pmts in subsystems
         cross_systems_cols = merge(cross_systems_cols, (ged_pmt = _build_muon_evt_cut(data, sel, global_events, pmt_events),))

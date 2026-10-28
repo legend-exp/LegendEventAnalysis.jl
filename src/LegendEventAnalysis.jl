@@ -16,7 +16,9 @@ using Measurements: measurement
 
 using LegendDataManagement
 
+using FillArrays: Fill
 using IntervalSets: AbstractInterval, ClosedInterval, leftendpoint, rightendpoint
+using PrecompileTools
 using ProgressMeter
 using PropertyFunctions: PropertyFunction, @pf, filterby, PropSelFunction
 
@@ -36,5 +38,6 @@ include("calibrate_pmts.jl")
 include("calibrate_aux.jl")
 include("calibrate_all.jl")
 include("time_evolution.jl")
+include("precompile.jl")
 
 end # module
