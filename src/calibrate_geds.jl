@@ -23,6 +23,7 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
 
     # get energy and psd calibration functions for the detector
     cal_pf = get_ged_cal_propfunc(data, sel, detector; pars_type=e_cal_pars_type, pars_cat=e_cal_pars_cat)
+    daqecal_pf = get_ged_daqecal_propfunc(data, sel, detector)
     psd_pf = get_ged_psd_propfunc(data, sel, detector; aoe_pars_type=aoe_cal_pars_type, aoe_pars_cat=aoe_cal_pars_cat, lq_pars_type=lq_cal_pars_type, lq_pars_cat=lq_cal_pars_cat)
 
     # get qc labels
@@ -48,6 +49,8 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
 
     # apply calibrations 
     cal_output = cal_pf.(detdata)
+    # the DAQ energy is stored as `e_fc` in the DSP output
+    daqecal_output = daqecal_pf.(StructArray(daqenergy = detdata.e_fc))
     psd_output = psd_pf.(StructArray(merge(columns(cal_output), columns(detdata))))
     cal_detdata = StructArray(merge(columns(cal_output), columns(psd_output), columns(detdata)))
 
@@ -79,7 +82,7 @@ function calibrate_ged_detector_data(data::LegendData, sel::AnyValiditySelection
         is_physical_trig = is_physical_trig,
     )
 
-    return StructVector(merge(columns(detdata_output), columns(cal_output), columns(psd_output), columns(postcal_data), additional_psd_cols, columns(cut_output), additional_qc_cols))
+    return StructVector(merge(columns(detdata_output), columns(cal_output), columns(daqecal_output), columns(psd_output), columns(postcal_data), additional_psd_cols, columns(cut_output), additional_qc_cols))
 end
 export calibrate_ged_detector_data
 
